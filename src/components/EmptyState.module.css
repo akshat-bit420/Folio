@@ -1,0 +1,28 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 72px 0;
+}
+
+.title {
+  margin: 0;
+  font: 22px/1.4 var(--font-display);
+  color: var(--ink);
+}
+
+.action {
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--ink);
+  font: 13px/1.2 var(--font-ui);
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--chrome-hover);
+}

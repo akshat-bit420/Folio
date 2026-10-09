@@ -1,0 +1,20 @@
+:root,
+[data-theme='kindle'] {
+  --surface: #e9e1d2;
+  --paper: #f4ecd8;
+  --ink: #3a3228;
+  --ink-soft: #6f6558;
+  --chrome: #efe6d5;
+  --chrome-hover: #e7dcc6;
+  --border: rgb(58 50 40 / 0.12);
+  --border-strong: rgb(58 50 40 / 0.2);
+  --progress: #8d7a5e;
+  --progress-track: rgb(58 50 40 / 0.1);
+  --highlight: rgb(196 164 108 / 0.4);
+  --annotation: #8a6d46;
+  --hint: rgb(58 50 40 / 0.72);
+  --danger: #8a4a3a;
+  --shadow: 0 1px 2px rgb(58 50 40 / 0.06);
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
+}

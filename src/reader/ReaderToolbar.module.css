@@ -1,0 +1,82 @@
+.bar {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: color-mix(in srgb, var(--chrome) 92%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 8;
+  white-space: nowrap;
+}
+
+.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: 12px/1.2 var(--font-ui);
+  letter-spacing: 0.02em;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--chrome-hover);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.active {
+  background: var(--chrome-hover);
+}
+
+.rule {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+  margin: 0 4px;
+}
+
+.pageForm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pageInput {
+  width: 42px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  font: 12px/1.2 var(--font-ui);
+  text-align: center;
+  padding: 4px 2px;
+}
+
+.pageTotal {
+  font: 12px/1.2 var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.zoom {
+  min-width: 40px;
+  text-align: center;
+  font: 12px/1.2 var(--font-ui);
+  color: var(--ink-soft);
+}

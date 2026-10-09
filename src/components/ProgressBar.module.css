@@ -1,0 +1,11 @@
+.track {
+  height: 3px;
+  background: var(--progress-track);
+  width: 100%;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--progress);
+}

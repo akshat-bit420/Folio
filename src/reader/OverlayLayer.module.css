@@ -1,0 +1,27 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.highlight {
+  position: absolute;
+  background: var(--highlight);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.annotation {
+  position: absolute;
+  padding: 0;
+  border: none;
+  background: color-mix(in srgb, var(--highlight) 55%, transparent);
+  border-bottom: 1px dotted var(--annotation);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.annotationActive {
+  background: color-mix(in srgb, var(--highlight) 80%, transparent);
+}
