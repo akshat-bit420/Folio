@@ -1,36 +1,38 @@
-<<<<<<< HEAD
-# React + TypeScript + Vite
+# Folio
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A Kindle-inspired PDF reader built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+Folio is a personal project exploring a minimal, distraction-free reading experience for PDFs, with a focus on a clean interface and a paper-like(working on this) visual theme.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Why I'm Building This
 
-## React Compiler
+Folio is also a learning ground for my next project: a TUI (Terminal User Interface) application written in Go.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+I'm using this project to get more comfortable working with AI coding agents, understanding multi-file codebases, and figuring out how to review, debug, and maintain code generated with AI assistance. I want to carry those lessons into my next project while becoming more independent as a developer.
 
-## Expanding the Oxlint configuration
+The goal isn't just to generate an application, but to gradually understand its internals, debug issues, and become more confident working with the code myself.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Tech Stack
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+* React
+* TypeScript
+* Vite
+* CSS Modules
+* IndexedDB for local data storage (may or may not be implemented).
+
+## Project Status
+
+Work in progress. Some features may be incomplete or under development.
+
+## Running Locally
+
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-=======
-# Folio
->>>>>>> 71cd758c7570460f730da1d5484cc06ea0d21510
+## Goals
+
+* Build a comfortable, distraction-free PDF reading experience.
+* Explore PDF rendering, bookmarks, annotations, and reading progress.
+* Learn how to understand, debug, and maintain a codebase developed with AI coding agents.
