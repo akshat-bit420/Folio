@@ -16,7 +16,7 @@ import type {
   MarkupTool,
   ReadingProgress,
 } from '../types/models'
-import type { PageSelection } from '../utils/selection'
+import { clearBrowserSelection, type PageSelection } from '../utils/selection'
 import { nowIso, percentForPage } from '../utils/time'
 import { AnnotationComposer } from './AnnotationComposer'
 import { AnnotationPopover } from './AnnotationPopover'
@@ -27,7 +27,7 @@ import { ReaderToolbar } from './ReaderToolbar'
 import styles from './ReaderScreen.module.css'
 
 const MIN_SCALE = 0.6
-const MAX_SCALE = 2.4
+const MAX_SCALE = 3.0
 const SCALE_STEP = 0.1
 
 export function ReaderScreen() {
@@ -198,9 +198,10 @@ export function ReaderScreen() {
       if (tool === 'highlight') {
         void saveHighlight(selection)
         setTool('none')
-        window.getSelection()?.removeAllRanges()
+        clearBrowserSelection()
       } else if (tool === 'annotate') {
         setPendingAnnotation(selection)
+        clearBrowserSelection()
       }
     },
     [book, tool],
@@ -253,7 +254,7 @@ export function ReaderScreen() {
     if (next === 'highlight') {
       if (selection) {
         void saveHighlight(selection)
-        window.getSelection()?.removeAllRanges()
+        clearBrowserSelection()
         lastSelection.current = null
         setTool('none')
         return
@@ -264,6 +265,7 @@ export function ReaderScreen() {
     }
     if (selection) {
       setPendingAnnotation(selection)
+      clearBrowserSelection()
       setTool('annotate')
       return
     }
@@ -385,6 +387,8 @@ export function ReaderScreen() {
           onCancel={() => {
             setPendingAnnotation(null)
             setTool('none')
+            clearBrowserSelection()
+            lastSelection.current = null
           }}
           onSave={(body) => {
             const annotation: Annotation = {
@@ -403,7 +407,7 @@ export function ReaderScreen() {
             setAnnotations((current) => [...current, annotation])
             setPendingAnnotation(null)
             setTool('none')
-            window.getSelection()?.removeAllRanges()
+            clearBrowserSelection()
             lastSelection.current = null
           }}
         />

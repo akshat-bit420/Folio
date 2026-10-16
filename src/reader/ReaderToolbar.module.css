@@ -43,7 +43,25 @@
 }
 
 .active {
-  background: var(--chrome-hover);
+  color: var(--accent-active);
+  background: var(--accent-active-bg);
+  box-shadow: inset 0 0 0 1px var(--accent-active-border);
+}
+
+.active:hover:not(:disabled) {
+  background: var(--accent-active-bg);
+}
+
+.bar > .btn:nth-child(7).active,
+.bar > button:nth-of-type(4).active {
+  color: var(--bookmark-active);
+  background: var(--bookmark-active-bg);
+  box-shadow: none;
+}
+
+.bar > .btn:nth-child(7).active:hover:not(:disabled),
+.bar > button:nth-of-type(4).active:hover:not(:disabled) {
+  background: var(--bookmark-active-bg);
 }
 
 .rule {

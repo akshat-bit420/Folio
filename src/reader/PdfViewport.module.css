@@ -3,13 +3,36 @@
   display: inline-block;
   background: var(--paper);
   box-shadow: var(--shadow);
+
+  isolation: isolate;
 }
 
 .canvas {
   display: block;
   background: var(--paper);
+  /*filter for kindle theme*/
+  filter: grayscale(100%) contrast(1.55) brightness(0.92);
+  /*2. mix blend mode*/
+  mix-blend-mode: multiply;
 }
 
+/* .textLayer {
+  pointer-events: none;
+  user-select: none;
+
+} */
 .textLayer {
+  position: absolute;
+  inset: 0;
+  /* z-index: 3; */
+  pointer-events: none;
+  user-select: none;
+}
+
+.textLayer :global(span) {
   pointer-events: auto;
+  user-select: text;
+  cursor: text;
+
+  color: transparent !important;
 }

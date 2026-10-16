@@ -3,12 +3,15 @@
   inset: 0;
   pointer-events: none;
   z-index: 2;
+
+  mix-blend-mode: multiply;
 }
 
 .highlight {
   position: absolute;
   background: var(--highlight);
-  mix-blend-mode: multiply;
+  /* mix-blend-mode: multiply; */
+  border-radius: 2px;
   pointer-events: none;
 }
 
@@ -16,12 +19,15 @@
   position: absolute;
   padding: 0;
   border: none;
-  background: color-mix(in srgb, var(--highlight) 55%, transparent);
-  border-bottom: 1px dotted var(--annotation);
+  background-color: var(--annotation-wash, rgb(217 119 6 / 0.28));
+  /* border-bottom: 2px dashed var(--annotation); */
+  border-bottom: 2px dashed #b45309;
+  box-sizing: border-box;
   pointer-events: auto;
   cursor: pointer;
 }
 
+.annotation:hover,
 .annotationActive {
-  background: color-mix(in srgb, var(--highlight) 80%, transparent);
+  background-color: rgb(217 119 6 / 0.44);
 }
