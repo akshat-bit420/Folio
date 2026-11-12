@@ -1,3 +1,30 @@
+/* :root,
+[data-theme='kindle'] {
+  --surface: #e9e1d2;
+  --paper: #f4ecd8;
+  --ink: #3a3228;
+  --ink-soft: #6f6558;
+  --chrome: #efe6d5;
+  --chrome-hover: #dfd2b8;
+  --border: rgb(58 50 40 / 0.12);
+  --border-strong: rgb(58 50 40 / 0.2);
+  --progress: #b45309;
+  --progress-track: rgb(58 50 40 / 0.1);
+  --highlight: rgb(245 158 11 / 0.48);
+  --annotation: #b45309;
+  --annotation-wash: rgb(217 119 6 / 0.28);
+  --accent-active: #b45309;
+  --accent-active-bg: rgb(180 83 9 / 0.16);
+  --accent-active-border: rgb(180 83 9 / 0.4);
+  --bookmark-active: #9f1239;
+  --bookmark-active-bg: rgb(159 18 57 / 0.14);
+  --hint: rgb(58 50 40 / 0.72);
+  --danger: #8a4a3a;
+  --shadow: 0 1px 2px rgb(58 50 40 / 0.06);
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
+} */
+
 :root,
 [data-theme='kindle'] {
   --surface: #e9e1d2;
@@ -10,9 +37,9 @@
   --border-strong: rgb(58 50 40 / 0.2);
   --progress: #b45309;
   --progress-track: rgb(58 50 40 / 0.1);
-  --highlight: rgb(245 158 11 / 0.36);
+  --highlight: rgb(245 158 11 / 0.48);
   --annotation: #b45309;
-  --annotation-wash: rgb(217 119 6 / 0.22);
+  --annotation-wash: rgb(217 119 6 / 0.28);
   --accent-active: #b45309;
   --accent-active-bg: rgb(180 83 9 / 0.16);
   --accent-active-border: rgb(180 83 9 / 0.4);
@@ -23,4 +50,4 @@
   --shadow: 0 1px 2px rgb(58 50 40 / 0.06);
   --font-ui: 'Segoe UI', system-ui, sans-serif;
   --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
-}
+} 
