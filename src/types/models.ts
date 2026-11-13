@@ -16,6 +16,8 @@ export type ReadingProgress = {
   lastPdfPage: number
   sequenceIndex: number
   percent: number
+  /** Reader zoom at the time the progress was saved (1 = fit width). */
+  scale?: number
   updatedAt: string
 }
 

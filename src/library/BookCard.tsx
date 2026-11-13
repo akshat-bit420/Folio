@@ -23,8 +23,12 @@ export function BookCard({ book, progress, coverUrl, onOpen }: BookCardProps) {
       </div>
       <h2 className={styles.title}>{book.title}</h2>
       <ProgressBar value={percent} />
-      <p className={styles.meta}>{percent}% read</p>
+      <p className={styles.meta}>
+        {progress && book.pageCount > 0
+          ? `Page ${progress.lastPdfPage} of ${book.pageCount} · ${percent}% read`
+          : 'Not started yet'}
+      </p>
       <p className={styles.meta}>{formatRelativeOpened(book.lastOpenedAt)}</p>
     </button>
   )
-}
+} 

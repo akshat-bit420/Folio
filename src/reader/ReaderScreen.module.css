@@ -71,3 +71,24 @@
   border-color: var(--accent-active-border);
   background: var(--accent-active-bg);
 }
+
+.settingsAction {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--danger);
+  font: 13px/1.4 var(--font-ui);
+  cursor: pointer;
+}
+
+.settingsAction:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.settingsAction:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -48,12 +48,17 @@ export function ReaderScreen() {
   const pageRef = useRef(1)
   const sequenceIndexRef = useRef(0)
   const lastSelection = useRef<PageSelection | null>(null)
+  // bookId whose progress is safe to persist (its load completed and the
+  // restored page is live in pageRef). Guards the visibilitychange handler
+  // against writing load-time defaults over a stored progress record.
+  const loadedForRef = useRef<string | null>(null)
 
   const [engineReady, setEngineReady] = useState(false)
   const [pageCount, setPageCount] = useState(1)
   const [pageNumber, setPageNumber] = useState(1)
   const [sequenceIndex, setSequenceIndex] = useState(0)
   const [scale, setScale] = useState(1)
+  const scaleRef = useRef(1)
   const [pageInput, setPageInput] = useState('1')
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [highlights, setHighlights] = useState<Highlight[]>([])
@@ -69,7 +74,7 @@ export function ReaderScreen() {
   const { visible, bump } = useIdleChrome(2500, heldChrome)
 
   const persistProgress = useCallback(
-    async (page: number, index: number) => {
+    async (page: number, index: number, nextScale?: number) => {
       if (!bookId) return
       const total = book?.pageCount || pageCount
       const progress: ReadingProgress = {
@@ -77,6 +82,7 @@ export function ReaderScreen() {
         lastPdfPage: page,
         sequenceIndex: index,
         percent: percentForPage(page, total),
+        scale: nextScale ?? scaleRef.current,
         updatedAt: nowIso(),
       }
       await progressRepo.put(progress)
@@ -111,6 +117,7 @@ export function ReaderScreen() {
     const engine = engineRef.current
 
     const load = async () => {
+      loadedForRef.current = null
       setEngineReady(false)
       setLoadError(null)
       const blob = await filesRepo.get(bookId)
@@ -126,12 +133,21 @@ export function ReaderScreen() {
       const items = buildPdfSequence(count)
       const stored = await progressRepo.get(bookId)
       const page = Math.min(Math.max(stored?.lastPdfPage ?? 1, 1), Math.max(count, 1))
-      const index = stored?.sequenceIndex ?? indexForPdfPage(items, page)
+      // Trust the stored sequence index only when it still maps back to the
+      // stored page; a stale or foreign record would otherwise land the
+      // reader on a page that disagrees with the one we just restored.
+      const index =
+        stored != null && pdfPageAt(items, stored.sequenceIndex) === stored.lastPdfPage
+          ? stored.sequenceIndex
+          : indexForPdfPage(items, page)
       sequenceIndexRef.current = index
       pageRef.current = page
       setSequenceIndex(index)
       setPageNumber(page)
       setPageInput(String(page))
+      if (stored && page > 1) {
+        showHint(`Resumed at page ${page} of ${count}`)
+      }
 
       const [nextBookmarks, nextHighlights, nextAnnotations] = await Promise.all([
         bookmarksRepo.forBook(bookId),
@@ -143,15 +159,26 @@ export function ReaderScreen() {
       setHighlights(nextHighlights)
       setAnnotations(nextAnnotations)
 
+      // Zoom is part of the reading context: restore the stored scale when
+      // it is sane, otherwise fall back to fitting the stage width.
       const size = await engine.getPageSize(page)
       const stage = stageRef.current
       if (stage && size.width > 0) {
         const available = Math.min(stage.clientWidth - 80, 920)
         const fitted = Math.min(MAX_SCALE, Math.max(MIN_SCALE, available / size.width))
-        setScale(Number(fitted.toFixed(2)))
+        const storedScale = stored?.scale
+        const restoredScale =
+          typeof storedScale === 'number' && Number.isFinite(storedScale)
+            ? Math.min(MAX_SCALE, Math.max(MIN_SCALE, storedScale))
+            : fitted
+        setScale(Number(restoredScale.toFixed(2)))
+        scaleRef.current = Number(restoredScale.toFixed(2))
       }
 
       setEngineReady(true)
+      // From here on pageRef/sequenceIndexRef hold THIS book's restored
+      // position, so persisting them (page turns, tab hide) is safe.
+      loadedForRef.current = bookId
       void persistRef.current(page, index)
     }
 
@@ -162,14 +189,22 @@ export function ReaderScreen() {
 
     return () => {
       cancelled = true
-      void persistRef.current(pageRef.current, sequenceIndexRef.current)
+      // No progress persist here on purpose. Under StrictMode this cleanup
+      // runs on the aborted first mount with pageRef still at its default,
+      // and on a book switch persistRef has already re-closed over the NEXT
+      // bookId — either write would clobber a real saved position. Every
+      // genuine exit path persists explicitly (page turns, zoom changes,
+      // visibilitychange, Library/Notes buttons), so nothing is lost.
       void engine.destroy()
     }
   }, [bookId])
 
   useEffect(() => {
     const onHide = () => {
-      if (document.visibilityState === 'hidden') {
+      if (
+        document.visibilityState === 'hidden' &&
+        loadedForRef.current === bookId
+      ) {
         void persistProgress(pageRef.current, sequenceIndexRef.current)
       }
     }
@@ -179,6 +214,16 @@ export function ReaderScreen() {
 
   const onPrev = useCallback(() => goToIndex(sequenceIndex - 1), [goToIndex, sequenceIndex])
   const onNext = useCallback(() => goToIndex(sequenceIndex + 1), [goToIndex, sequenceIndex])
+
+  const changeScale = useCallback(
+    (next: number) => {
+      const clamped = Number(Math.min(MAX_SCALE, Math.max(MIN_SCALE, next)).toFixed(2))
+      setScale(clamped)
+      scaleRef.current = clamped
+      void persistProgress(pageRef.current, sequenceIndexRef.current, clamped)
+    },
+    [persistProgress],
+  )
 
   const exitChrome = useCallback(() => {
     if (document.fullscreenElement) {
@@ -347,8 +392,8 @@ export function ReaderScreen() {
           closeReader('notes')
         }}
         onSettings={() => setSettingsOpen((open) => !open)}
-        onZoomOut={() => setScale((value) => Math.max(MIN_SCALE, Number((value - SCALE_STEP).toFixed(2))))}
-        onZoomIn={() => setScale((value) => Math.min(MAX_SCALE, Number((value + SCALE_STEP).toFixed(2))))}
+        onZoomOut={() => changeScale(scale - SCALE_STEP)}
+        onZoomIn={() => changeScale(scale + SCALE_STEP)}
         zoomLabel={`${Math.round(scale * 100)}%`}
         onFullscreen={() => {
           const node = stageRef.current
@@ -384,6 +429,19 @@ export function ReaderScreen() {
           >
             Dark e-ink
             <span className={styles.themeOptionSub}>Floating text, no page edges</span>
+          </button>
+          <p className={styles.settingsLabel}>Position</p>
+          <button
+            type="button"
+            className={styles.settingsAction}
+            onClick={() => {
+              goToIndex(0)
+              showHint('Back at page 1')
+            }}
+            disabled={sequenceIndex === 0}
+          >
+            Restart from page 1
+            <span className={styles.themeOptionSub}>Clears this book's resume point</span>
           </button>
         </div>
       ) : null}

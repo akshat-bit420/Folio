@@ -56,6 +56,9 @@ export function LibraryPage() {
             <span className={styles.continueTitle}>{continueBook.title}</span>
             <ProgressBar value={progressById[continueBook.id]?.percent ?? 0} />
             <span className={styles.continueMeta}>
+              {progressById[continueBook.id] && continueBook.pageCount > 0
+                ? `Page ${progressById[continueBook.id].lastPdfPage} of ${continueBook.pageCount} · `
+                : ''}
               {progressById[continueBook.id]?.percent ?? 0}% read ·{' '}
               {formatRelativeOpened(continueBook.lastOpenedAt)}
             </span>
@@ -80,4 +83,4 @@ export function LibraryPage() {
       )}
     </section>
   )
-}
+} 
