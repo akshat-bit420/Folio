@@ -1,4 +1,4 @@
-export type ThemeId = 'kindle'
+export type ThemeId = 'kindle' | 'dark'
 
 export type AppView = 'library' | 'notes' | 'activity' | 'reader'
 
@@ -82,4 +82,4 @@ export type ReadingItem =
   | { kind: 'pdf'; pageNumber: number }
   | { kind: 'personal'; id: string }
 
-export type MarkupTool = 'none' | 'highlight' | 'annotate'
+export type MarkupTool = 'none' | 'highlight' | 'annotate' 

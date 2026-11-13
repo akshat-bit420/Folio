@@ -40,14 +40,34 @@
   color: var(--ink-soft);
 }
 
-.settingsValue {
-  margin: 0 0 8px;
-  font: 16px/1.3 var(--font-display);
+.themeOption {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
   color: var(--ink);
+  font: 13px/1.4 var(--font-ui);
+  cursor: pointer;
 }
 
-.settingsHint {
-  margin: 0;
-  font: 12px/1.4 var(--font-ui);
+.themeOption:last-of-type {
+  margin-bottom: 0;
+}
+
+.themeOption:hover {
+  border-color: var(--border-strong);
+}
+
+.themeOptionSub {
+  display: block;
+  font: 11px/1.4 var(--font-ui);
   color: var(--ink-soft);
+}
+
+.themeOptionActive {
+  border-color: var(--accent-active-border);
+  background: var(--accent-active-bg);
 }

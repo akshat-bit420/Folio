@@ -1,131 +1,4 @@
-// import { useEffect, useRef, type ReactNode } from 'react'
-// import type { RenderTask } from 'pdfjs-dist'
-// import type { Annotation, Highlight } from '../types/models'
-// import { capturePageSelection, type PageSelection } from '../utils/selection'
-// import { OverlayLayer } from './OverlayLayer'
-// import { PdfEngine } from './pdf/PdfEngine'
-// import './pdf/textLayer.css'
-// import styles from './PdfViewport.module.css'
-
-// type PdfViewportProps = {
-//   engine: PdfEngine
-//   pageNumber: number
-//   scale: number
-//   highlights: Highlight[]
-//   annotations: Annotation[]
-//   activeAnnotationId: string | null
-//   onSelectAnnotation: (id: string | null) => void
-//   onSelection: (selection: PageSelection | null) => void
-//   children?: ReactNode
-// }
-
-// export function PdfViewport({
-//   engine,
-//   pageNumber,
-//   scale,
-//   highlights,
-//   annotations,
-//   activeAnnotationId,
-//   onSelectAnnotation,
-//   onSelection,
-//   children,
-// }: PdfViewportProps) {
-//   const canvasRef = useRef<HTMLCanvasElement>(null)
-//   const textRef = useRef<HTMLDivElement>(null)
-//   const pageRef = useRef<HTMLDivElement>(null)
-//   const activeTaskRef = useRef<RenderTask | null>(null)
-//   const renderQueueRef = useRef(Promise.resolve())
-//   const genRef = useRef(0)
-//   const textLayerPageRef = useRef<number | null>(null)
-
-//   useEffect(() => {
-//     const canvas = canvasRef.current
-//     const textLayer = textRef.current
-//     if (!canvas || !textLayer) return
-
-//     const gen = ++genRef.current
-//     textLayerPageRef.current = null
-//     textLayer.replaceChildren()
-
-//     let cancelled = false
-//     let textTask: { cancel: () => void } | null = null
-
-//     const executeRender = async () => {
-//       try {
-//         if (activeTaskRef.current) {
-//           activeTaskRef.current.cancel()
-//           await activeTaskRef.current.promise.catch(() => {})
-//           activeTaskRef.current = null
-//         }
-//         if (cancelled || gen !== genRef.current) return
-
-//         const renderTask = await engine.renderPage({ pageNumber, canvas, scale })
-//         activeTaskRef.current = renderTask
-//         if (cancelled || gen !== genRef.current) {
-//           renderTask.cancel()
-//           await renderTask.promise.catch(() => {})
-//           return
-//         }
-
-//         await renderTask.promise
-//         if (cancelled || gen !== genRef.current) return
-
-//         textTask = await engine.renderTextLayer({ pageNumber, container: textLayer, scale })
-//         if (cancelled || gen !== genRef.current) {
-//           textTask.cancel()
-//           return
-//         }
-//         textLayerPageRef.current = pageNumber
-//       } catch (error) {
-//         if (cancelled || gen !== genRef.current) return
-//         const name = error instanceof Error ? error.name : ''
-//         if (name !== 'RenderingCancelledException') console.error(error)
-//       }
-//     }
-
-//     renderQueueRef.current = renderQueueRef.current.then(executeRender, executeRender)
-
-//     return () => {
-//       cancelled = true
-//       textLayerPageRef.current = null
-//       activeTaskRef.current?.cancel()
-//       textTask?.cancel()
-//     }
-//   }, [engine, pageNumber, scale])
-
-//   useEffect(() => {
-//     const onMouseUp = () => {
-//       window.setTimeout(() => {
-//         const textLayer = textRef.current
-//         if (!textLayer || textLayerPageRef.current !== pageNumber) return
-//         const captured = capturePageSelection(textLayer, pageNumber)
-//         if (captured) onSelection(captured)
-//       }, 10)
-//     }
-
-//     window.addEventListener('mouseup', onMouseUp)
-//     return () => window.removeEventListener('mouseup', onMouseUp)
-//   }, [onSelection, pageNumber])
-
-//   const pageHighlights = highlights.filter((item) => item.anchor.pageNumber === pageNumber)
-//   const pageAnnotations = annotations.filter((item) => item.anchor.pageNumber === pageNumber)
-
-//   return (
-//     <div ref={pageRef} className={styles.page} onMouseDown={() => onSelectAnnotation(null)}>
-//       <canvas ref={canvasRef} className={styles.canvas} />
-//       <div ref={textRef} className={`textLayer ${styles.textLayer}`} />
-//       <OverlayLayer
-//         highlights={pageHighlights}
-//         annotations={pageAnnotations}
-//         activeAnnotationId={activeAnnotationId}
-//         onSelectAnnotation={onSelectAnnotation}
-//       />
-//       {children}
-//     </div>
-//   )
-// }
-
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { RenderTask, TextLayer } from 'pdfjs-dist'
 import type { Annotation, Highlight } from '../types/models'
 import { diag } from '../utils/diag'
@@ -191,6 +64,8 @@ export function PdfViewport({
     minY: 0,
     maxY: 0,
   })
+  const prevPageRef = useRef<number | null>(null)
+  const [flip, setFlip] = useState<'none' | 'forward' | 'backward'>('none')
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -217,7 +92,7 @@ export function PdfViewport({
         // Cancel whatever canvas/text work the previous page still had going.
         if (activeTaskRef.current) {
           activeTaskRef.current.cancel()
-          await activeTaskRef.current.promise.catch(() => {})
+          await activeTaskRef.current.promise.catch(() => { })
           activeTaskRef.current = null
         }
         if (textTaskRef.current) {
@@ -238,7 +113,7 @@ export function PdfViewport({
         ensureEndOfContent(textLayer)
 
         const mountText = async (): Promise<boolean> => {
-          const {layer, textItems } = await engine.renderTextLayer({
+          const { layer, textItems } = await engine.renderTextLayer({
             pageNumber,
             container: textLayer,
             scale,
@@ -270,7 +145,7 @@ export function PdfViewport({
           const renderTask = await engine.renderPage({ pageNumber, canvas, scale })
           if (stale()) {
             renderTask.cancel()
-            await renderTask.promise.catch(() => {})
+            await renderTask.promise.catch(() => { })
             return
           }
           activeTaskRef.current = renderTask
@@ -322,6 +197,20 @@ export function PdfViewport({
       }
     }
   }, [engine, pageNumber, scale])
+
+  // Subtle page-turn cue whenever the displayed page changes. Purely
+  // cosmetic: it animates the page container after the render pipeline has
+  // already been switched, so it can never delay or break rendering, and it
+  // is disabled for users with reduced-motion preferences (see the module
+  // css). No flip on first mount (prev === null).
+  useEffect(() => {
+    const prev = prevPageRef.current
+    prevPageRef.current = pageNumber
+    if (prev === null || prev === pageNumber) return
+    setFlip(pageNumber > prev ? 'forward' : 'backward')
+    const timer = window.setTimeout(() => setFlip('none'), 320)
+    return () => window.clearTimeout(timer)
+  }, [pageNumber])
 
   // Restore pdf.js's selecting marker behaviour on the text layer.
   useEffect(() => {
@@ -391,14 +280,14 @@ export function PdfViewport({
       window.setTimeout(() => {
         const tracePayload = trace.moved
           ? {
-              moved: true,
-              downX: trace.downX,
-              downY: trace.downY,
-              endX: trace.endX,
-              endY: trace.endY,
-              minY: trace.minY,
-              maxY: trace.maxY,
-            }
+            moved: true,
+            downX: trace.downX,
+            downY: trace.downY,
+            endX: trace.endX,
+            endY: trace.endY,
+            minY: trace.minY,
+            maxY: trace.maxY,
+          }
           : undefined
         const captured = capturePageSelection(pageEl, tracePayload, pageNumber)
         if (captured) {
@@ -438,7 +327,13 @@ export function PdfViewport({
   return (
     <div
       ref={pageRef}
-      className={styles.page}
+      className={[
+        styles.page,
+        flip === 'forward' ? styles.flipForward : '',
+        flip === 'backward' ? styles.flipBackward : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       onMouseDown={() => onSelectAnnotation(null)}
     >
       <canvas ref={canvasRef} className={styles.canvas} />

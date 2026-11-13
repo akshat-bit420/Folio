@@ -31,3 +31,22 @@
 .annotationActive {
   background-color: rgb(217 119 6 / 0.44);
 }
+
+/* ------------------------------------------------------------------ */
+/* Dark e-ink theme. multiply would push the gold washes toward black  */
+/* over the dark page, so the layer switches to screen: the wash then  */
+/* brightens only the paper between glyphs — markup glows and the      */
+/* text itself stays fully readable.                                   */
+/* ------------------------------------------------------------------ */
+:global([data-theme='dark']) .layer {
+  mix-blend-mode: screen;
+}
+
+:global([data-theme='dark']) .annotation {
+  border-bottom-color: var(--annotation);
+}
+
+:global([data-theme='dark']) .annotation:hover,
+:global([data-theme='dark']) .annotationActive {
+  background-color: rgb(245 158 11 / 0.34);
+}
