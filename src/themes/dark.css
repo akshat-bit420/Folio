@@ -38,3 +38,20 @@
     --font-ui: 'Segoe UI', system-ui, sans-serif;
     --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
 }
+
+/* Island on dark e-ink: the charcoal droplet from the approved design —
+   warm near-black body, cream text, amber fill. A hairline cream edge keeps
+   the pill legible over the floating-text page, which is nearly the same
+   color. */
+:root[data-theme='dark'] {
+    --island-bg: rgb(28 24 18 / 0.92);
+    --island-border: rgb(242 234 217 / 0.1);
+    --island-ink: #f2ead9;
+    --island-ink-soft: rgb(242 234 217 / 0.55);
+    --island-track: rgb(242 234 217 / 0.22);
+    --island-sep: rgb(242 234 217 / 0.16);
+    --island-hover-bg: rgb(242 234 217 / 0.12);
+    --island-accent: #d29a55;
+    --island-accent-soft: #e8b269;
+    --island-shadow: 0 6px 22px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.55);
+}
