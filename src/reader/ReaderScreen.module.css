@@ -21,10 +21,12 @@
 }
 
 .settings {
-  position: absolute;
+  /* Fixed like the island: the panel belongs to the droplet layer, so it
+     must not slide away when the stage scrolls. */
+  position: fixed;
   top: 62px;
   right: 28px;
-  z-index: 9;
+  z-index: 41;
   width: 200px;
   padding: 14px;
   background: var(--chrome);
