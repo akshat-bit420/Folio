@@ -1,0 +1,270 @@
+/* Design A — the droplet island.
+ *
+ * Fixed to the viewport (survives scroll — the old absolute bar slid away
+ * with the stage). Idle: a small pill with page number, total and a progress
+ * track. Hover/focus/click: it morphs open — the idle extras collapse while
+ * the control row grows in (grid-template-columns 1fr<->0fr), so the width
+ * animates instead of snapping. Collapse is delayed by a 2s grace window
+ * (see COLLAPSE_GRACE_MS) and eases out slower than it opens.
+ *
+ * All colors come from the island's own --island-* variable set so each
+ * reading theme can give the chip its own scheme without touching the page.
+ */
+
+.wrap {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+}
+
+.island {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--island-bg);
+  border: 1px solid var(--island-border);
+  color: var(--island-ink);
+  box-shadow: var(--island-shadow);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  white-space: nowrap;
+  user-select: none;
+  transition: padding 340ms cubic-bezier(0.32, 0.72, 0.3, 1), box-shadow 340ms ease;
+}
+
+.open {
+  padding: 0 18px;
+}
+
+.pg {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--island-ink);
+  font: 600 13px/1.2 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  padding: 0;
+  margin-right: 9px;
+  text-align: center;
+  min-width: 0;
+  cursor: text;
+}
+
+.pg:focus {
+  outline: none;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 var(--island-accent);
+}
+
+/* Page-turn slide-tick: the number slides in from the reading direction. */
+.tickFwd {
+  animation: tickFwd 320ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+
+.tickBack {
+  animation: tickBack 320ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+
+@keyframes tickFwd {
+  from {
+    opacity: 0.15;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tickBack {
+  from {
+    opacity: 0.15;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Width morph: both expanders transition their grid column together. */
+.idleExpander,
+.expandExpander {
+  display: grid;
+  min-width: 0;
+  transition: grid-template-columns 460ms cubic-bezier(0.32, 0.72, 0.3, 1);
+}
+
+.open .idleExpander,
+.open .expandExpander {
+  transition-duration: 340ms;
+}
+
+.idleExpander {
+  grid-template-columns: 1fr;
+}
+
+.open .idleExpander {
+  grid-template-columns: 0fr;
+}
+
+.expandExpander {
+  grid-template-columns: 0fr;
+}
+
+.open .expandExpander {
+  grid-template-columns: 1fr;
+}
+
+.idleClip {
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  opacity: 1;
+  transition: opacity 200ms ease 60ms;
+}
+
+.open .idleClip {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+.tot {
+  font: 500 12px/1.2 var(--font-ui);
+  color: var(--island-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  position: relative;
+  width: 58px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--island-track);
+  overflow: hidden;
+  flex: none;
+}
+
+.track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--island-accent);
+  border-radius: 2px;
+  transition: width 240ms ease;
+}
+
+.ctrlsClip {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ctrls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 4px;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0.3, 1);
+}
+
+.open .ctrls {
+  opacity: 1;
+  transform: none;
+  transition-delay: 90ms;
+}
+
+.cbtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--island-ink);
+  opacity: 0.85;
+  padding: 0;
+  flex: none;
+  transition: background 140ms ease, opacity 140ms ease, color 140ms ease;
+}
+
+.cbtn:hover:not(:disabled),
+.cbtnOn:hover:not(:disabled) {
+  background: var(--island-hover-bg);
+  opacity: 1;
+}
+
+.cbtn:focus-visible {
+  outline: 1px solid var(--island-accent);
+  outline-offset: 1px;
+}
+
+.cbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.cbtnOn {
+  color: var(--island-accent-soft);
+  opacity: 1;
+}
+
+.cbtn svg {
+  display: block;
+}
+
+.sep {
+  width: 1px;
+  height: 16px;
+  background: var(--island-sep);
+  margin: 0 5px;
+  flex: none;
+}
+
+.zoomLabel {
+  min-width: 38px;
+  text-align: center;
+  font: 500 12px/1.2 var(--font-ui);
+  color: var(--island-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Expanded-state underline progress line along the bottom of the pill. */
+.iline {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--island-track);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 260ms ease 100ms;
+  pointer-events: none;
+}
+
+.open .iline {
+  opacity: 1;
+}
+
+.iline i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--island-accent);
+  border-radius: 2px;
+  transition: width 240ms ease;
+}
