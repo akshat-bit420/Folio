@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFolio } from '../app/FolioContext'
-import { useIdleChrome } from '../hooks/useIdleChrome'
 import { useShortcuts } from '../hooks/useShortcuts'
 import {
   annotationsRepo,
@@ -23,7 +22,7 @@ import { AnnotationPopover } from './AnnotationPopover'
 import { PdfEngine } from './pdf/PdfEngine'
 import { PdfViewport } from './PdfViewport'
 import { buildPdfSequence, indexForPdfPage, pdfPageAt } from './readingSequence'
-import { ReaderToolbar } from './ReaderToolbar'
+import { ReaderIsland } from './ReaderIsland'
 import styles from './ReaderScreen.module.css'
 
 const MIN_SCALE = 0.6
@@ -70,8 +69,10 @@ export function ReaderScreen() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const sequence = useMemo(() => buildPdfSequence(pageCount), [pageCount])
+  // Settings/composer/markup tools hold the island open instead of the old
+  // idle timer — the droplet never hides itself, only folds shut.
   const heldChrome = Boolean(pendingAnnotation || activeAnnotationId || settingsOpen || tool !== 'none')
-  const { visible, bump } = useIdleChrome(2500, heldChrome)
+  const [islandExpanded, setIslandExpanded] = useState(false)
 
   const persistProgress = useCallback(
     async (page: number, index: number, nextScale?: number) => {
@@ -352,6 +353,19 @@ export function ReaderScreen() {
     goToIndex(indexForPdfPage(sequence, next))
   }
 
+  // Clicking the page (anything outside the island) dismisses the settings
+  // panel; the island then folds after its grace window once the hold clears.
+  const dismissSettings = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!settingsOpen) return
+      const target = event.target as Element | null
+      if (target && !target.closest('[data-island-root]')) {
+        setSettingsOpen(false)
+      }
+    },
+    [settingsOpen],
+  )
+
   const activeAnnotation = annotations.find((item) => item.id === activeAnnotationId) ?? null
 
   if (!book) {
@@ -363,23 +377,19 @@ export function ReaderScreen() {
   }
 
   return (
-    <div
-      ref={stageRef}
-      className={styles.stage}
-      onMouseMove={bump}
-      onClick={bump}
-    >
-      <ReaderToolbar
-        visible={visible || heldChrome}
-        pageLabel={`/ ${pageCount}`}
+    <div ref={stageRef} className={styles.stage} onClick={dismissSettings}>
+      <ReaderIsland
+        pageNumber={pageNumber}
+        pageCount={pageCount}
         pageInput={pageInput}
         onPageInputChange={setPageInput}
         onPageCommit={commitPage}
+        percent={percentForPage(pageNumber, pageCount)}
         canPrev={sequenceIndex > 0}
         canNext={sequenceIndex < sequence.length - 1}
         onPrev={onPrev}
         onNext={onNext}
-        onBack={() => {
+        onLibrary={() => {
           void persistProgress(pageRef.current, sequenceIndexRef.current)
           closeReader('library')
         }}
@@ -401,9 +411,11 @@ export function ReaderScreen() {
           if (document.fullscreenElement) void document.exitFullscreen()
           else void node.requestFullscreen()
         }}
+        held={heldChrome}
+        onExpandedChange={setIslandExpanded}
       />
 
-      {settingsOpen && (visible || heldChrome) ? (
+      {settingsOpen && (islandExpanded || heldChrome) ? (
         <div className={styles.settings}>
           <p className={styles.settingsLabel}>Reading theme</p>
           <button
@@ -519,4 +531,4 @@ export function ReaderScreen() {
       ) : null}
     </div>
   )
-} 
+}
