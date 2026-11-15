@@ -5,10 +5,13 @@ import {
 } from 'pdfjs-dist'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 
-GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+// GlobalWorkerOptions.workerSrc = new URL(
+//   'pdfjs-dist/build/pdf.worker.min.mjs',
+//   import.meta.url,
+// ).toString()
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
+
+GlobalWorkerOptions.workerPort = new PdfWorker()
 
 export type PageSize = {
   width: number
