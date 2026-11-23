@@ -14,7 +14,10 @@
 .wrap {
   position: fixed;
   top: 18px;
-  left: 50%;
+  /* Center over the reading stage, not the window: the shell exposes how
+     much chrome (rail + outline panel) sits left of the stage, and we shift
+     by half of it. Falls back to plain viewport centering when absent. */
+  left: calc(50% + var(--stage-inset, 0px) / 2);
   transform: translateX(-50%);
   z-index: 40;
 }
