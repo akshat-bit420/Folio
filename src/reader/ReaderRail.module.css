@@ -1,0 +1,56 @@
+.rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    width: 52px;
+    padding: 10px 0;
+    background: var(--chrome);
+    border-right: 1px solid var(--border);
+}
+
+.railGap {
+    height: 8px;
+    flex: none;
+}
+
+.railBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+
+.railBtn svg {
+    width: 19px;
+    height: 19px;
+}
+
+.railBtn:hover:not(:disabled) {
+    background: var(--chrome-hover);
+    color: var(--ink);
+}
+
+.railBtn:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+/* Slivers of the island gold so the rail reads as the same family. */
+.railBtnOn {
+    background: var(--accent-active-bg);
+    border-color: var(--accent-active-border);
+    color: var(--island-accent);
+}
+
+.railLater {
+    opacity: 0.32;
+}
