@@ -19,10 +19,12 @@ import { clearBrowserSelection, type PageSelection } from '../utils/selection'
 import { nowIso, percentForPage } from '../utils/time'
 import { AnnotationComposer } from './AnnotationComposer'
 import { AnnotationPopover } from './AnnotationPopover'
-import { PdfEngine } from './pdf/PdfEngine'
+import { OutlinePanel } from './OutlinePanel'
+import { PdfEngine, type OutlineEntry } from './pdf/PdfEngine'
 import { PdfViewport } from './PdfViewport'
 import { buildPdfSequence, indexForPdfPage, pdfPageAt } from './readingSequence'
 import { ReaderIsland } from './ReaderIsland'
+import { ReaderRail } from './ReaderRail'
 import styles from './ReaderScreen.module.css'
 
 const MIN_SCALE = 0.6
@@ -67,6 +69,8 @@ export function ReaderScreen() {
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [outline, setOutline] = useState<OutlineEntry[]>([])
+  const [outlineOpen, setOutlineOpen] = useState(false)
 
   const sequence = useMemo(() => buildPdfSequence(pageCount), [pageCount])
   // Settings/composer/markup tools hold the island open instead of the old
@@ -131,6 +135,19 @@ export function ReaderScreen() {
 
       const count = engine.pageCount
       setPageCount(count)
+      setOutline([])
+      setOutlineOpen(false)
+      // The outline resolves over several worker round trips and is only
+      // chrome, not content — fetch it in the background so the reader's
+      // first paint never waits on it.
+      void engine
+        .getOutline()
+        .then((entries) => {
+          if (!cancelled) setOutline(entries)
+        })
+        .catch(() => {
+          if (!cancelled) setOutline([])
+        })
       const items = buildPdfSequence(count)
       const stored = await progressRepo.get(bookId)
       const page = Math.min(Math.max(stored?.lastPdfPage ?? 1, 1), Math.max(count, 1))
@@ -344,13 +361,20 @@ export function ReaderScreen() {
     showHint('Select text to annotate')
   }
 
+  const jumpToPage = useCallback(
+    (page: number) => {
+      goToIndex(indexForPdfPage(sequence, page))
+    },
+    [goToIndex, sequence],
+  )
+
   const commitPage = () => {
     const next = Number.parseInt(pageInput, 10)
     if (!Number.isFinite(next)) {
       setPageInput(String(pageNumber))
       return
     }
-    goToIndex(indexForPdfPage(sequence, next))
+    jumpToPage(next)
   }
 
   // Clicking the page (anything outside the island) dismisses the settings
@@ -377,158 +401,173 @@ export function ReaderScreen() {
   }
 
   return (
-    <div ref={stageRef} className={styles.stage} onClick={dismissSettings}>
-      <ReaderIsland
-        pageNumber={pageNumber}
-        pageCount={pageCount}
-        pageInput={pageInput}
-        onPageInputChange={setPageInput}
-        onPageCommit={commitPage}
-        percent={percentForPage(pageNumber, pageCount)}
-        canPrev={sequenceIndex > 0}
-        canNext={sequenceIndex < sequence.length - 1}
-        onPrev={onPrev}
-        onNext={onNext}
-        onLibrary={() => {
-          void persistProgress(pageRef.current, sequenceIndexRef.current)
-          closeReader('library')
-        }}
-        bookmarked={bookmarked}
-        onToggleBookmark={() => void toggleBookmark()}
-        tool={tool}
-        onTool={handleTool}
-        onNotes={() => {
-          void persistProgress(pageRef.current, sequenceIndexRef.current)
-          closeReader('notes')
-        }}
-        onSettings={() => setSettingsOpen((open) => !open)}
-        onZoomOut={() => changeScale(scale - SCALE_STEP)}
-        onZoomIn={() => changeScale(scale + SCALE_STEP)}
-        zoomLabel={`${Math.round(scale * 100)}%`}
-        onFullscreen={() => {
-          const node = stageRef.current
-          if (!node) return
-          if (document.fullscreenElement) void document.exitFullscreen()
-          else void node.requestFullscreen()
-        }}
-        held={heldChrome}
-        onExpandedChange={setIslandExpanded}
+    <div className={outlineOpen ? `${styles.shell} ${styles.shellPanel}` : styles.shell}>
+      <ReaderRail
+        outlineAvailable={outline.length > 0}
+        outlineOpen={outlineOpen}
+        onToggleOutline={() => setOutlineOpen((open) => !open)}
       />
-
-      {settingsOpen && (islandExpanded || heldChrome) ? (
-        <div className={styles.settings}>
-          <p className={styles.settingsLabel}>Reading theme</p>
-          <button
-            type="button"
-            className={
-              theme === 'kindle'
-                ? `${styles.themeOption} ${styles.themeOptionActive}`
-                : styles.themeOption
-            }
-            onClick={() => setTheme('kindle')}
-          >
-            Kindle
-            <span className={styles.themeOptionSub}>Warm e-ink monochrome</span>
-          </button>
-          <button
-            type="button"
-            className={
-              theme === 'dark'
-                ? `${styles.themeOption} ${styles.themeOptionActive}`
-                : styles.themeOption
-            }
-            onClick={() => setTheme('dark')}
-          >
-            Dark e-ink
-            <span className={styles.themeOptionSub}>Floating text, no page edges</span>
-          </button>
-          <p className={styles.settingsLabel}>Position</p>
-          <button
-            type="button"
-            className={styles.settingsAction}
-            onClick={() => {
-              goToIndex(0)
-              showHint('Back at page 1')
-            }}
-            disabled={sequenceIndex === 0}
-          >
-            Restart from page 1
-            <span className={styles.themeOptionSub}>Clears this book's resume point</span>
-          </button>
-        </div>
-      ) : null}
-
-      <div className={styles.pageWrap}>
-        {loadError ? (
-          <p className={styles.status}>{loadError}</p>
-        ) : engineReady ? (
-          <PdfViewport
-            engine={engineRef.current}
-            pageNumber={pageNumber}
-            scale={scale}
-            highlights={highlights}
-            annotations={annotations}
-            activeAnnotationId={activeAnnotationId}
-            onSelectAnnotation={setActiveAnnotationId}
-            onSelection={applySelection}
-          >
-            {activeAnnotation ? (
-              <AnnotationPopover
-                annotation={activeAnnotation}
-                onClose={() => setActiveAnnotationId(null)}
-                onDelete={() => {
-                  void annotationsRepo.remove(activeAnnotation.id)
-                  setAnnotations((current) =>
-                    current.filter((item) => item.id !== activeAnnotation.id),
-                  )
-                  setActiveAnnotationId(null)
-                }}
-                onSave={(body) => {
-                  const next = { ...activeAnnotation, body, updatedAt: nowIso() }
-                  void annotationsRepo.put(next)
-                  setAnnotations((current) =>
-                    current.map((item) => (item.id === next.id ? next : item)),
-                  )
-                }}
-              />
-            ) : null}
-          </PdfViewport>
-        ) : (
-          <p className={styles.status}>Opening…</p>
-        )}
-      </div>
-
-      {pendingAnnotation ? (
-        <AnnotationComposer
-          selectedText={pendingAnnotation.selectedText}
-          onCancel={() => {
-            setPendingAnnotation(null)
-            setTool('none')
-            clearBrowserSelection()
-            lastSelection.current = null
-          }}
-          onSave={(body) => {
-            const annotation: Annotation = {
-              id: crypto.randomUUID(),
-              bookId: book.id,
-              anchor: {
-                pageNumber: pageRef.current,
-                selectedText: pendingAnnotation.selectedText,
-                rects: pendingAnnotation.rects,
-              },
-              body,
-              createdAt: nowIso(),
-              updatedAt: nowIso(),
-            }
-            void annotationsRepo.put(annotation)
-            setAnnotations((current) => [...current, annotation])
-            setPendingAnnotation(null)
-            setTool('none')
-            clearBrowserSelection()
-            lastSelection.current = null
-          }}
+      {outlineOpen ? (
+        <OutlinePanel
+          outline={outline}
+          pageNumber={pageNumber}
+          onJump={jumpToPage}
+          onClose={() => setOutlineOpen(false)}
         />
       ) : null}
+      <div ref={stageRef} className={styles.stage} onClick={dismissSettings}>
+        <ReaderIsland
+          pageNumber={pageNumber}
+          pageCount={pageCount}
+          pageInput={pageInput}
+          onPageInputChange={setPageInput}
+          onPageCommit={commitPage}
+          percent={percentForPage(pageNumber, pageCount)}
+          canPrev={sequenceIndex > 0}
+          canNext={sequenceIndex < sequence.length - 1}
+          onPrev={onPrev}
+          onNext={onNext}
+          onLibrary={() => {
+            void persistProgress(pageRef.current, sequenceIndexRef.current)
+            closeReader('library')
+          }}
+          bookmarked={bookmarked}
+          onToggleBookmark={() => void toggleBookmark()}
+          tool={tool}
+          onTool={handleTool}
+          onNotes={() => {
+            void persistProgress(pageRef.current, sequenceIndexRef.current)
+            closeReader('notes')
+          }}
+          onSettings={() => setSettingsOpen((open) => !open)}
+          onZoomOut={() => changeScale(scale - SCALE_STEP)}
+          onZoomIn={() => changeScale(scale + SCALE_STEP)}
+          zoomLabel={`${Math.round(scale * 100)}%`}
+          onFullscreen={() => {
+            const node = stageRef.current
+            if (!node) return
+            if (document.fullscreenElement) void document.exitFullscreen()
+            else void node.requestFullscreen()
+          }}
+          held={heldChrome}
+          onExpandedChange={setIslandExpanded}
+        />
+
+        {settingsOpen && (islandExpanded || heldChrome) ? (
+          <div className={styles.settings}>
+            <p className={styles.settingsLabel}>Reading theme</p>
+            <button
+              type="button"
+              className={
+                theme === 'kindle'
+                  ? `${styles.themeOption} ${styles.themeOptionActive}`
+                  : styles.themeOption
+              }
+              onClick={() => setTheme('kindle')}
+            >
+              Kindle
+              <span className={styles.themeOptionSub}>Warm e-ink monochrome</span>
+            </button>
+            <button
+              type="button"
+              className={
+                theme === 'dark'
+                  ? `${styles.themeOption} ${styles.themeOptionActive}`
+                  : styles.themeOption
+              }
+              onClick={() => setTheme('dark')}
+            >
+              Dark e-ink
+              <span className={styles.themeOptionSub}>Floating text, no page edges</span>
+            </button>
+            <p className={styles.settingsLabel}>Position</p>
+            <button
+              type="button"
+              className={styles.settingsAction}
+              onClick={() => {
+                goToIndex(0)
+                showHint('Back at page 1')
+              }}
+              disabled={sequenceIndex === 0}
+            >
+              Restart from page 1
+              <span className={styles.themeOptionSub}>Clears this book's resume point</span>
+            </button>
+          </div>
+        ) : null}
+
+        <div className={styles.pageWrap}>
+          {loadError ? (
+            <p className={styles.status}>{loadError}</p>
+          ) : engineReady ? (
+            <PdfViewport
+              engine={engineRef.current}
+              pageNumber={pageNumber}
+              scale={scale}
+              highlights={highlights}
+              annotations={annotations}
+              activeAnnotationId={activeAnnotationId}
+              onSelectAnnotation={setActiveAnnotationId}
+              onSelection={applySelection}
+            >
+              {activeAnnotation ? (
+                <AnnotationPopover
+                  annotation={activeAnnotation}
+                  onClose={() => setActiveAnnotationId(null)}
+                  onDelete={() => {
+                    void annotationsRepo.remove(activeAnnotation.id)
+                    setAnnotations((current) =>
+                      current.filter((item) => item.id !== activeAnnotation.id),
+                    )
+                    setActiveAnnotationId(null)
+                  }}
+                  onSave={(body) => {
+                    const next = { ...activeAnnotation, body, updatedAt: nowIso() }
+                    void annotationsRepo.put(next)
+                    setAnnotations((current) =>
+                      current.map((item) => (item.id === next.id ? next : item)),
+                    )
+                  }}
+                />
+              ) : null}
+            </PdfViewport>
+          ) : (
+            <p className={styles.status}>Opening…</p>
+          )}
+        </div>
+
+        {pendingAnnotation ? (
+          <AnnotationComposer
+            selectedText={pendingAnnotation.selectedText}
+            onCancel={() => {
+              setPendingAnnotation(null)
+              setTool('none')
+              clearBrowserSelection()
+              lastSelection.current = null
+            }}
+            onSave={(body) => {
+              const annotation: Annotation = {
+                id: crypto.randomUUID(),
+                bookId: book.id,
+                anchor: {
+                  pageNumber: pageRef.current,
+                  selectedText: pendingAnnotation.selectedText,
+                  rects: pendingAnnotation.rects,
+                },
+                body,
+                createdAt: nowIso(),
+                updatedAt: nowIso(),
+              }
+              void annotationsRepo.put(annotation)
+              setAnnotations((current) => [...current, annotation])
+              setPendingAnnotation(null)
+              setTool('none')
+              clearBrowserSelection()
+              lastSelection.current = null
+            }}
+          />
+        ) : null}
+      </div>
     </div>
   )
-}
+} 
