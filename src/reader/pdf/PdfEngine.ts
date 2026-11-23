@@ -4,18 +4,29 @@ import {
   TextLayer,
 } from 'pdfjs-dist'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
-
-// GlobalWorkerOptions.workerSrc = new URL(
-//   'pdfjs-dist/build/pdf.worker.min.mjs',
-//   import.meta.url,
-// ).toString()
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
+// Vite-bundled worker, inlined into the bundle (?worker&inline). The
+// previous setup resolved the worker with new URL('...', import.meta.url),
+// which Vite cannot rewrite for bare package specifiers — on Firefox the
+// fallback resolution ends up at file:// and the browser blocks it ("may
+// not load or link to file:///"). workerPort hands pdf.js a real Worker
+// instance, and the inline suffix embeds the worker code so the build
+// stays a single self-contained file (needed for the standalone Folio.html).
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&inline'
 
 GlobalWorkerOptions.workerPort = new PdfWorker()
 
 export type PageSize = {
   width: number
   height: number
+}
+
+/** One flattened row of the document outline (table of contents). */
+export type OutlineEntry = {
+  title: string
+  /** 1-based page the entry points at. */
+  pageNumber: number
+  /** 0 for top-level entries (parts), 1 for chapters, 2 for sections, … */
+  depth: number
 }
 
 export class PdfEngine {
@@ -44,6 +55,68 @@ export class PdfEngine {
     } catch {
       return null
     }
+  }
+
+  /**
+   * Flattens the PDF's embedded outline (table of contents) into rows in
+   * document order, each resolved to a real page number. Entries whose
+   * destination cannot be resolved (broken refs, external links) are
+   * skipped, so a partially broken outline still shows its usable rows.
+   * An empty list means the document has no outline.
+   */
+  async getOutline(): Promise<OutlineEntry[]> {
+    if (!this.doc) return []
+    const doc = this.doc
+    const raw = await doc.getOutline()
+    if (!raw || raw.length === 0) return []
+
+    // Flatten first so page lookups can run concurrently — each getPageIndex
+    // is a worker round trip, and sequential awaits would visibly stall a
+    // several-hundred-entry book outline.
+    const flat: { title: string; depth: number; dest: unknown }[] = []
+    const walk = (items: typeof raw, depth: number) => {
+      for (const item of items ?? []) {
+        flat.push({ title: item.title?.trim() || 'Untitled section', depth, dest: item.dest })
+        walk(item.items, depth + 1)
+      }
+    }
+    walk(raw, 0)
+
+    // Destinations repeat a lot (parts pointing at the same page as their
+    // first chapter, named destinations reused across entries), so resolve
+    // each unique destination once and share that promise.
+    const cache = new Map<string, Promise<number | null>>()
+    const resolvePage = (dest: unknown): Promise<number | null> => {
+      const key = Array.isArray(dest)
+        ? `ref:${String((dest[0] as { num?: unknown } | undefined)?.num)}:${String((dest[0] as { gen?: unknown } | undefined)?.gen)}`
+        : typeof dest === 'string'
+          ? `named:${dest}`
+          : 'none'
+      let pending = cache.get(key)
+      if (!pending) {
+        pending = (async () => {
+          try {
+            const explicit = Array.isArray(dest)
+              ? dest
+              : typeof dest === 'string'
+                ? await doc.getDestination(dest)
+                : null
+            const ref = explicit?.[0] as { num?: unknown } | undefined
+            if (!ref || typeof ref.num !== 'number') return null
+            return (await doc.getPageIndex(ref as { num: number; gen: number })) + 1
+          } catch {
+            return null
+          }
+        })()
+        cache.set(key, pending)
+      }
+      return pending
+    }
+
+    const pages = await Promise.all(flat.map((entry) => resolvePage(entry.dest)))
+    return flat
+      .map((entry, index) => ({ ...entry, pageNumber: pages[index] ?? 0 }))
+      .filter((entry) => entry.pageNumber > 0)
   }
 
   async getPageSize(pageNumber: number): Promise<PageSize> {
