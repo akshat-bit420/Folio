@@ -1,6 +1,25 @@
+/* Reader shell: rail + outline panel + scrollable stage, one row. The rail
+   is permanent chrome with its own space (never borrowed from the Island);
+   the outline panel opens and closes beside it. --stage-inset is how much
+   chrome sits left of the stage: fixed-position chrome (the island) adds
+   half of it to its viewport centering so it stays centered over the PAGE,
+   not the window. */
+.shell {
+  --stage-inset: 52px;
+  display: flex;
+  height: 100svh;
+  background: var(--surface);
+}
+
+.shellPanel {
+  --stage-inset: 352px;
+}
+
 .stage {
   position: relative;
-  min-height: 100svh;
+  flex: 1;
+  min-width: 0;
+  height: 100svh;
   background: var(--surface);
   overflow: auto;
 }
