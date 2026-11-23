@@ -1,4 +1,4 @@
-/* Dark e-ink theme — pitch-dark paper, floating text.
+/* Dark e-ink theme — true-black room, warm page sheet, one green accent.
  *
  * The PDF pipeline still renders the page the normal way: the engine
  * paints warm paper (--pdf-paper: #f4ecd8) and dark ink. PdfViewport's
@@ -7,13 +7,18 @@
  *   paper #f4ecd8 -> #151413
  *   ink   #1a1a1a -> #f2f2ee
  *
- * --paper and --surface are BOTH #151413 on purpose: when the app
- * background, the reader background and the rendered page are the same
- * color, the page rectangle has no visible edge — the text simply
- * floats, like a real Kindle in dark mode. No borders, no shadows.
+ * Review feedback after the first Emerald Depth pass: the teal room was
+ * too much — "the background should remain black". So surfaces are the
+ * original neutral blacks again, and the page sheet stays visible the
+ * quiet way: the room sits a step darker than the page bitmap, and
+ * --shadow draws a faint hairline plus a soft drop shadow around the
+ * sheet. The green is an ACCENT, not a surface color: it appears only
+ * where the user acts — active rail/panel states, the current outline
+ * row, island progress — never on backgrounds. The hue is sampled from
+ * the approved theme-variants mock (Graphite variant): #33d094.
  */
 :root[data-theme='dark'] {
-    --surface: #151413;
+    --surface: #0e0d0c;
     --paper: #151413;
     --pdf-paper: #f4ecd8;
     --ink: #f2f2ee;
@@ -22,27 +27,26 @@
     --chrome-hover: #2b2925;
     --border: rgb(235 228 214 / 0.1);
     --border-strong: rgb(235 228 214 / 0.18);
-    --progress: #f59e0b;
+    --progress: #33d094;
     --progress-track: rgb(235 228 214 / 0.12);
-    --highlight: rgb(245 158 11 / 0.45);
-    --annotation: #f59e0b;
-    --annotation-wash: rgb(217 119 6 / 0.26);
-    --accent-active: #f59e0b;
-    --accent-active-bg: rgb(245 158 11 / 0.14);
-    --accent-active-border: rgb(245 158 11 / 0.35);
+    --highlight: rgb(51 208 148 / 0.32);
+    --annotation: #33d094;
+    --annotation-wash: rgb(51 208 148 / 0.22);
+    --accent-active: #33d094;
+    --accent-active-bg: rgb(51 208 148 / 0.14);
+    --accent-active-border: rgb(51 208 148 / 0.35);
     --bookmark-active: #fb7185;
     --bookmark-active-bg: rgb(251 113 133 / 0.16);
     --hint: rgb(235 228 214 / 0.66);
     --danger: #e07856;
-    --shadow: none;
+    --shadow: 0 0 0 1px rgb(235 228 214 / 0.07), 0 18px 44px rgb(0 0 0 / 0.5);
     --font-ui: 'Segoe UI', system-ui, sans-serif;
     --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
 }
 
-/* Island on dark e-ink: the charcoal droplet from the approved design —
-   warm near-black body, cream text, amber fill. A hairline cream edge keeps
-   the pill legible over the floating-text page, which is nearly the same
-   color. */
+/* Island on dark: the charcoal droplet from the approved design — warm
+   near-black body, cream text, and the Graphite green as its accent
+   (progress fill, active page number, armed tool states). */
 :root[data-theme='dark'] {
     --island-bg: rgb(28 24 18 / 0.92);
     --island-border: rgb(242 234 217 / 0.1);
@@ -51,7 +55,7 @@
     --island-track: rgb(242 234 217 / 0.22);
     --island-sep: rgb(242 234 217 / 0.16);
     --island-hover-bg: rgb(242 234 217 / 0.12);
-    --island-accent: #d29a55;
-    --island-accent-soft: #e8b269;
+    --island-accent: #33d094;
+    --island-accent-soft: #6fe3b8;
     --island-shadow: 0 6px 22px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.55);
 }

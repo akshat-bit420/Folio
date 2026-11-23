@@ -478,7 +478,7 @@ export function ReaderScreen() {
               onClick={() => setTheme('dark')}
             >
               Dark e-ink
-              <span className={styles.themeOptionSub}>Floating text, no page edges</span>
+              <span className={styles.themeOptionSub}>True-black room, visible page sheet</span>
             </button>
             <p className={styles.settingsLabel}>Position</p>
             <button

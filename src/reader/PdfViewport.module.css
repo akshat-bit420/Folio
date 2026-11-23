@@ -38,12 +38,13 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Dark e-ink theme. The engine still paints warm paper + dark ink;    */
-/* this filter inverts the rendered page's luminance, turning the      */
-/* canvas into warm near-black paper (#151413) with warm off-white     */
-/* text (#f2f2ee). themes/dark.css sets --paper and --surface to       */
-/* exactly #151413, so the page rectangle has no visible edge: text    */
-/* floats on the background. mix-blend-mode goes back to normal —      */
+/* Dark e-ink theme ("Emerald Depth"). The engine still paints warm    */
+/* paper + dark ink; this filter inverts the rendered page's luminance,*/
+/* turning the canvas into warm near-black paper (#151413) with warm   */
+/* off-white text (#f2f2ee). themes/dark.css sets the room (--surface) */
+/* to the palette's deep teal #0f2027 and supplies --shadow, so the    */
+/* page reads as a visible warm sheet lying in a cool room instead of  */
+/* edgeless floating text. mix-blend-mode goes back to normal —        */
 /* multiply over a dark page would push everything to pure black.      */
 /* ------------------------------------------------------------------ */
 :global([data-theme='dark']) .canvas {
@@ -51,46 +52,54 @@
   mix-blend-mode: normal;
 }
 
-:global([data-theme='dark']) .page {
-  box-shadow: none;
-}
-
 /* ------------------------------------------------------------------ */
 /* Page-turn animation. Runs on the page container after the render    */
 /* pipeline has already switched pages, so it never delays painting.   */
+/*                                                                     */
+/* Deliberately 2D: translate + opacity only. The canvas below is a    */
+/* blend-mode (light) or 5-function-filter (dark) texture, so a        */
+/* perspective() rotateY() here forces a 3D re-rasterization of that   */
+/* subtree on every frame. On GPU-composited machines that is free,    */
+/* but on machines without GPU acceleration the 280ms animation       */
+/* stretches into seconds of CPU churn — a slow melted tilt instead    */
+/* of a crisp flip. 2D translate + opacity are composited as a cached  */
+/* texture move everywhere, so the cue stays identical-feeling and     */
+/* never melts. will-change is safe here: the class detaches ~320ms    */
+/* after each flip (see PdfViewport.tsx), so the layer hint is torn    */
+/* down with the animation.                                            */
 /* ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: no-preference) {
   .flipForward {
-    transform-origin: left center;
     animation: flipInForward 280ms cubic-bezier(0.2, 0.8, 0.3, 1) 1;
+    will-change: transform, opacity;
   }
 
   .flipBackward {
-    transform-origin: right center;
     animation: flipInBackward 280ms cubic-bezier(0.2, 0.8, 0.3, 1) 1;
+    will-change: transform, opacity;
   }
 }
 
 @keyframes flipInForward {
   from {
-    transform: perspective(1600px) rotateY(-12deg) translateX(2%);
+    transform: translateX(16px);
     opacity: 0.5;
   }
 
   to {
-    transform: perspective(1600px) rotateY(0deg) translateX(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
 @keyframes flipInBackward {
   from {
-    transform: perspective(1600px) rotateY(12deg) translateX(-2%);
+    transform: translateX(-16px);
     opacity: 0.5;
   }
 
   to {
-    transform: perspective(1600px) rotateY(0deg) translateX(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
