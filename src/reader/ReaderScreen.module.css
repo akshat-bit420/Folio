@@ -33,6 +33,262 @@
   padding: 72px 40px 64px;
 }
 
+/* Two pages in one flex row (spread mode). The padding MUST stay in sync
+   with SPREAD_PAD_X / SPREAD_PAD_Y / SPREAD_GAP in ReaderScreen.tsx — the
+   auto-fit subtracts them from the measured stage box. The two sheets meet
+   at the spine (gap 0); the book shell below wraps them. min-height (not
+   height) keeps the wrapper growable, so zooming past the fit scrolls
+   naturally instead of clipping the pages. */
+.pageWrapSpread {
+  align-items: center;
+  gap: 0;
+  padding: 32px 16px 20px;
+}
+
+/* ------------------------------------------------------------------ */
+/* The physical book shell (spread mode only). A hardcover wrapping    */
+/* the two live sheets, stacked page edges peeking out around them, a  */
+/* shaded spine at the seam, inner curvature shadows near the gutter   */
+/* and a soft floor shadow — the book lying in the room instead of two */
+/* floating sheets.                                                    */
+/*                                                                     */
+/* The shell box IS the two pages (flex content); every decoration is  */
+/* absolutely anchored to its edges, so it all tracks the pages when   */
+/* zoom re-renders the canvases bigger or smaller. The overhang the    */
+/* cover adds (26px sides, 18px top, 26px bottom) is counted in        */
+/* SPREAD_PAD_X / SPREAD_PAD_Y so the auto-fit always leaves room.     */
+/* ------------------------------------------------------------------ */
+.book {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Room for the 3D page-turn: the sheet rotates around the spine. */
+  perspective: 3600px;
+}
+
+.bookCover {
+  position: absolute;
+  left: -26px;
+  right: -26px;
+  top: -18px;
+  bottom: -26px;
+  border-radius: 18px 11px 15px 11px;
+  background: linear-gradient(158deg, #3a2d20 0%, #241a10 52%, #170f07 100%);
+  box-shadow:
+    0 30px 70px rgb(0 0 0 / 0.42),
+    0 6px 18px rgb(0 0 0 / 0.3),
+    inset 0 1px 0 rgb(244 236 216 / 0.12);
+  pointer-events: none;
+}
+
+/* Dark room: the cover drops a step darker so the cream text stays the
+   brightest thing on screen and the sheet edges carry the light. */
+:global([data-theme='dark']) .bookCover {
+  background: linear-gradient(158deg, #221d17 0%, #15110d 52%, #0c0a08 100%);
+  box-shadow:
+    0 30px 70px rgb(0 0 0 / 0.55),
+    0 6px 18px rgb(0 0 0 / 0.4),
+    inset 0 1px 0 rgb(244 236 216 / 0.08);
+}
+
+/* The stacked sheet block: a cream slab slightly larger than the pages,
+   with per-sheet hairlines only in its exposed edges. Middle stays plain
+   — the live pages cover it anyway. */
+.bookBlock {
+  position: absolute;
+  left: -11px;
+  right: -11px;
+  top: -12px;
+  bottom: -14px;
+  border-radius: 6px;
+  background: #e8e0cb;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+}
+
+.stackTop,
+.stackBot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(180deg,
+      #f6f1e2 0 2.5px,
+      #cfc6ae 2.5px 3.5px,
+      #ab9f83 3.5px 4.5px);
+}
+
+.stackTop {
+  top: 0;
+  height: 12px;
+}
+
+.stackBot {
+  bottom: 0;
+  height: 14px;
+}
+
+.stackSideL,
+.stackSideR {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  background: repeating-linear-gradient(90deg,
+      #f6f1e2 0 2.5px,
+      #cfc6ae 2.5px 3.5px,
+      #ab9f83 3.5px 4.5px);
+}
+
+.stackSideL {
+  left: 0;
+}
+
+.stackSideR {
+  right: 0;
+}
+
+/* Inner curvature: the two sheets curve down toward the gutter. Two
+   half-width overlays keep each gradient anchored to its own sheet. */
+.bookShadeL {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: linear-gradient(90deg,
+      rgb(66 55 40 / 0) 72%,
+      rgb(66 55 40 / 0.1) 94%,
+      rgb(50 42 32 / 0.2) 100%);
+  pointer-events: none;
+}
+
+.bookShadeR {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: linear-gradient(270deg,
+      rgb(66 55 40 / 0) 72%,
+      rgb(66 55 40 / 0.1) 94%,
+      rgb(50 42 32 / 0.2) 100%);
+  pointer-events: none;
+}
+
+/* The spine itself: a narrow valley straddling the seam, darkest exactly
+   at the fold. */
+.bookGutter {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 140px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg,
+      rgb(0 0 0 / 0) 0%,
+      rgb(0 0 0 / 0.04) 30%,
+      rgb(52 44 34 / 0.16) 47%,
+      rgb(28 24 20 / 0.34) 50%,
+      rgb(52 44 34 / 0.16) 53%,
+      rgb(0 0 0 / 0.04) 70%,
+      rgb(0 0 0 / 0) 100%);
+  pointer-events: none;
+}
+
+/* Floor contact shadow under the whole book. */
+.bookShadow {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: -38px;
+  height: 46px;
+  background: radial-gradient(52% 100% at 50% 0%, rgb(0 0 0 / 0.4) 0%, rgb(0 0 0 / 0) 72%);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* The page-turn. A 3D overlay holding two static image faces of the   */
+/* sheets involved in the turn; the live canvases below never move.    */
+/* The theme look is baked into the captured pixels at capture time    */
+/* (bakeFace in ReaderScreen.tsx), so the faces are plain images: a    */
+/* CSS filter here would sit inside the preserve-3d subtree and get    */
+/* dropped by GPU compositors once the face flips past 90°, flashing   */
+/* raw paper mid-turn.                                                 */
+/* ------------------------------------------------------------------ */
+.turnFlipper {
+  position: absolute;
+  z-index: 12;
+  transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.turnFace {
+  position: absolute;
+  inset: 0;
+  /* No overflow: hidden — it flattens the face into a single composited
+     group, and Chromium/WebKit then stop honouring backface-visibility on
+     it, so the departing page bleeds through mirrored past 90°. The face
+     is one inset img with nothing to clip anyway. */
+  background: var(--paper);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.42);
+}
+
+.turnFaceFront {
+  /* Face visibility is owned HERE, keyed off the flipper's data-phase, and
+     nowhere else: the JSX carries no visibility style for React to hold a
+     copy of, so re-renders can never fight the imperative phase swap the
+     turn effect makes at the edge-on moment. */
+  visibility: visible;
+  /* Both faces need an explicit transform. Without one the front face gets
+     no compositing layer of its own, backface-visibility: hidden is not
+     honoured on it, and past 90° the departing page bleeds through MIRRORED
+     on the landing side until the flipper unmounts — the inverted-page
+     flash on every turn. The translateZ keeps the two faces 2px apart so
+     they never z-fight coplanar; the face pointing at the viewer is always
+     the closer one and wins the depth test even on an engine that still
+     paints a culled backface. With no perspective ancestor the 1px lift
+     has no visible offset, it is purely a depth-sort key. */
+  transform: rotateY(0deg) translateZ(1px);
+}
+
+.turnFaceBack {
+  visibility: hidden;
+  transform: rotateY(180deg) translateZ(1px);
+}
+
+/* Edge-on swap: the turn effect writes data-phase='landing' on the flipper
+   once the animation passes 50%, and these two overrides show the landing
+   face and hide the departing one in a single attribute write. */
+.turnFlipper[data-phase='landing'] .turnFaceFront {
+  visibility: hidden;
+}
+
+.turnFlipper[data-phase='landing'] .turnFaceBack {
+  visibility: visible;
+}
+
+.turnImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  /* No CSS filter / blend here ON PURPOSE — the theme treatment is baked
+     into the snapshot pixels at capture time (bakeFace in
+     ReaderScreen.tsx). A filter inside the 3D preserve-3d subtree gets
+     dropped by GPU compositors once the face flips past 90°, which flashed
+     raw paper mid-turn on real machines. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turnFlipper {
+    display: none;
+  }
+}
+
 .status {
   margin: 28vh auto 0;
   color: var(--ink-soft);

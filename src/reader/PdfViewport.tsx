@@ -17,6 +17,14 @@ type PdfViewportProps = {
   activeAnnotationId: string | null
   onSelectAnnotation: (id: string | null) => void
   onSelection: (selection: PageSelection | null) => void
+  onPainted?: () => void
+  /* The 2D flip-in cue (280ms opacity dip on the page container) belongs to
+     plain page changes. When the spread-mode 3D flip owns the transition the
+     sheet already provides the motion, and a dip that outlives the sheet
+     exposes a half-faded page over raw paper — the end-of-turn blink. The
+     reader passes true while a book flip is in flight so the cue is skipped
+     for the turn's commit. */
+  suppressFlipCue?: boolean
   children?: ReactNode
 }
 
@@ -45,6 +53,8 @@ export function PdfViewport({
   activeAnnotationId,
   onSelectAnnotation,
   onSelection,
+  onPainted,
+  suppressFlipCue,
   children,
 }: PdfViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -65,6 +75,14 @@ export function PdfViewport({
     maxY: 0,
   })
   const prevPageRef = useRef<number | null>(null)
+  // Kept in a ref so a new callback identity never re-runs the render effect.
+  const onPaintedRef = useRef(onPainted)
+  onPaintedRef.current = onPainted
+  // Same for the cue suppression: the turn commit changes pageNumber and this
+  // flag in the same render, and the effect below must read the value that
+  // belongs to that commit without re-subscribing.
+  const suppressFlipCueRef = useRef(suppressFlipCue ?? false)
+  suppressFlipCueRef.current = suppressFlipCue ?? false
   const [flip, setFlip] = useState<'none' | 'forward' | 'backward'>('none')
 
   useEffect(() => {
@@ -142,7 +160,15 @@ export function PdfViewport({
         }
 
         const paintCanvas = async () => {
-          const renderTask = await engine.renderPage({ pageNumber, canvas, scale })
+          // Turn-commit renders (the flip cue is suppressed exactly then)
+          // defer the canvas swap: the neighbouring slot is exposed while
+          // the sheet flies, and a stale page beats a blank one.
+          const renderTask = await engine.renderPage({
+            pageNumber,
+            canvas,
+            scale,
+            deferResize: suppressFlipCueRef.current,
+          })
           if (stale()) {
             renderTask.cancel()
             await renderTask.promise.catch(() => { })
@@ -150,6 +176,11 @@ export function PdfViewport({
           }
           activeTaskRef.current = renderTask
           await renderTask.promise
+          // First-paint signal for the page-turn commit gate (ReaderScreen
+          // holds the flipper until the landing canvases actually painted).
+          // The engine blits the finished render before this promise
+          // resolves, so the gate here also guarantees the pixels swapped.
+          if (!stale()) onPaintedRef.current?.()
         }
 
         diag('render-start', `page=${pageNumber} scale=${scale}`)
@@ -206,7 +237,9 @@ export function PdfViewport({
   useEffect(() => {
     const prev = prevPageRef.current
     prevPageRef.current = pageNumber
-    if (prev === null || prev === pageNumber) return
+    // A suppressed cue still advances prevPageRef: the page DID change, and
+    // the next unsuppressed change must compare against it.
+    if (prev === null || prev === pageNumber || suppressFlipCueRef.current) return
     setFlip(pageNumber > prev ? 'forward' : 'backward')
     const timer = window.setTimeout(() => setFlip('none'), 320)
     return () => window.clearTimeout(timer)
@@ -291,7 +324,14 @@ export function PdfViewport({
           : undefined
         const captured = capturePageSelection(pageEl, tracePayload, pageNumber)
         if (captured) {
-          onSelection(captured)
+          // Tag the capture with THIS viewport's page: in two-page spread
+          // mode two viewports are live at once, and the anchor must be the
+          // page the user actually dragged on. Cast, not a bare literal:
+          // project copies whose utils/selection.ts predates spread mode
+          // don't declare the optional `page` field, and a literal here
+          // would fail their tsc (TS2353 'page' does not exist). On the
+          // older revision the extra field is simply ignored at runtime.
+          onSelection({ ...captured, page: pageNumber } as PageSelection & { page?: number })
           return
         }
         // A real drag produced nothing. If the text layer was not ready

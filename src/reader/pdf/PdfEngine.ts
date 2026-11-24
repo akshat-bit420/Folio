@@ -130,18 +130,40 @@ export class PdfEngine {
     pageNumber: number
     canvas: HTMLCanvasElement
     scale: number
+    /** Render into an offscreen buffer and only touch the live canvas once
+     * the page is fully drawn. Turn-commit renders pass true: the flip
+     * sheet covers the slot it lands on, but never the neighbouring one —
+     * sizing/clearing the live canvas up front showed that neighbour a
+     * content-less paper page (and pdf.js's incremental flush a half-drawn
+     * one) for as long as the render took: the white blink at the end of
+     * slow turns. Deferred, the canvas keeps its PREVIOUS page's pixels
+     * until the finished render is blitted in one operation, so a slow
+     * render costs a late content swap, never a flash of blank paper. */
+    deferResize?: boolean
   }): Promise<RenderTask> {
     if (!this.doc) throw new Error('PDF is not open')
     const page = await this.doc.getPage(args.pageNumber)
     const viewport = page.getViewport({ scale: args.scale })
     const outputScale = Math.min(window.devicePixelRatio || 1, 2)
     const canvas = args.canvas
-    canvas.width = Math.floor(viewport.width * outputScale)
-    canvas.height = Math.floor(viewport.height * outputScale)
-    canvas.style.width = `${Math.floor(viewport.width)}px`
-    canvas.style.height = `${Math.floor(viewport.height)}px`
 
-    const ctx = canvas.getContext('2d', { alpha: false })
+    // All drawing targets the buffer; the live canvas is only written by
+    // the final blit.
+    const buffer = document.createElement('canvas')
+    buffer.width = Math.floor(viewport.width * outputScale)
+    buffer.height = Math.floor(viewport.height * outputScale)
+
+    if (!args.deferResize) {
+      // Immediate resize keeps plain page changes and zooms instant — the
+      // clear it causes is masked there by the 2D flip-in cue over fast
+      // renders.
+      canvas.width = buffer.width
+      canvas.height = buffer.height
+      canvas.style.width = `${Math.floor(viewport.width)}px`
+      canvas.style.height = `${Math.floor(viewport.height)}px`
+    }
+
+    const ctx = buffer.getContext('2d', { alpha: false })
     if (!ctx) throw new Error('Canvas is unavailable')
 
     const rootStyle = getComputedStyle(document.documentElement)
@@ -153,14 +175,34 @@ export class PdfEngine {
       rootStyle.getPropertyValue('--paper').trim() ||
       '#f4ecd8'
     ctx.fillStyle = paper
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillRect(0, 0, buffer.width, buffer.height)
 
-    return page.render({
+    const task = page.render({
       canvasContext: ctx,
-      canvas,
+      canvas: buffer,
       viewport,
       transform: [outputScale, 0, 0, outputScale, 0, 0],
     })
+    // Blit in the task's own resolution order: this handler is registered
+    // before any caller can await task.promise, so callers that gate on it
+    // (the paint gate in ReaderScreen) observe the blitted pixels, and the
+    // sheet never releases over a canvas that hasn't actually swapped. A
+    // cancelled or failed render skips the blit and the live canvas keeps
+    // its previous content until the next render lands.
+    task.promise.then(
+      () => {
+        canvas.width = buffer.width
+        canvas.height = buffer.height
+        canvas.style.width = `${Math.floor(viewport.width)}px`
+        canvas.style.height = `${Math.floor(viewport.height)}px`
+        const liveCtx = canvas.getContext('2d', { alpha: false })
+        if (liveCtx) liveCtx.drawImage(buffer, 0, 0)
+      },
+      () => {
+        // Cancelled or failed: keep the previous page's pixels.
+      },
+    )
+    return task
   }
 
   /**
