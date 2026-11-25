@@ -148,6 +148,24 @@
   font-variant-numeric: tabular-nums;
 }
 
+.track {
+  position: relative;
+  width: 58px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--island-track);
+  overflow: hidden;
+  flex: none;
+}
+
+.track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--island-accent);
+  border-radius: 2px;
+  transition: width 240ms ease;
+}
+
 .ctrlsClip {
   overflow: hidden;
   min-width: 0;
@@ -227,18 +245,31 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Progress line along the bottom of the pill — always visible, so the
-   collapsed island still shows how far into the book the reader is. */
+/* Underline progress line along the bottom of the pill. Open-only (v3.3
+ * behaviour): the compact pill shows its in-row track, so the pill never
+ * renders two bars at once — this bottom line fades in when the island
+ * unfolds. Open + scrubbing, it tracks the preview with the origin marker.
+ * Insets follow the padding of each state. */
 .iline {
   position: absolute;
-  left: 18px;
-  right: 18px;
+  left: 14px;
+  right: 14px;
   bottom: 0;
   height: 2px;
   border-radius: 2px;
   background: var(--island-track);
   overflow: hidden;
+  opacity: 0;
+  transition: opacity 260ms ease 100ms,
+    left 340ms cubic-bezier(0.32, 0.72, 0.3, 1),
+    right 340ms cubic-bezier(0.32, 0.72, 0.3, 1);
   pointer-events: none;
+}
+
+.open .iline {
+  left: 18px;
+  right: 18px;
+  opacity: 1;
 }
 
 .iline i {
@@ -247,4 +278,269 @@
   background: var(--island-accent);
   border-radius: 2px;
   transition: width 240ms ease;
+}
+
+/* ===== Wheel scrub (Change C) =====
+ * The page-number zone (input + "/ total" + track) scrubs: the wheel
+ * previews a target locally and one real turn commits when scrolling
+ * stops. pgZone is display:contents so the island's flex layout is
+ * untouched — it only exists to group the hover/scroll-sensitive area. */
+.pgZone {
+  display: contents;
+}
+
+.pg {
+  cursor: ns-resize;
+  transition: width 160ms ease;
+}
+
+.pg:focus {
+  cursor: text;
+}
+
+.idleClip {
+  cursor: ns-resize;
+}
+
+/* While scrubbing the underline tracks the previewed position exactly (no
+ * easing lag) and tints lighter, with a marker left at the starting point. */
+.scrubbing .iline i {
+  transition: none;
+  background: var(--island-accent-soft, #b45309);
+}
+
+/* Same scrub treatment for the compact pill's in-row track (the single
+ * visible bar there): it follows the preview without easing lag; the origin
+ * marker stays on the card's rail. */
+.scrubbing .track i {
+  transition: none;
+  background: var(--island-accent-soft, #b45309);
+}
+
+.ilineOrigin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--island-ink, #3a3228);
+  opacity: 0.9;
+}
+
+/* Hover hint under the pill — the discoverability cue for the scrub. */
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, -3px);
+  font: 500 11.5px/1 var(--font-ui);
+  white-space: nowrap;
+  color: var(--island-ink, #3a3228);
+  background: var(--island-bg, rgb(245 239 226 / 0.97));
+  border: 1px solid var(--island-border, rgb(58 50 40 / 0.22));
+  padding: 7px 10px;
+  border-radius: 8px;
+  box-shadow: var(--island-shadow, 0 6px 22px rgb(0 0 0 / 0.18)), 0 1px 3px rgb(0 0 0 / 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.tipOn {
+  opacity: 1;
+  transition-delay: 500ms;
+}
+
+.scrubbing~.tip {
+  opacity: 0 !important;
+  transition-delay: 0ms;
+}
+
+/* The scrub preview card. Lives below the pill; opens while the wheel (or
+ * the arrow keys on the focused number) moves the previewed position. */
+.peek {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  width: min(330px, calc(100vw - 32px));
+  transform: translate(-50%, -6px) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
+  background: var(--island-bg, rgb(245 239 226 / 0.97));
+  color: var(--island-ink, #3a3228);
+  border: 1px solid var(--island-border, rgb(58 50 40 / 0.22));
+  border-radius: 18px;
+  box-shadow: var(--island-shadow, 0 6px 22px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.2));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 14px 14px 12px;
+  transition: opacity 160ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0.3, 1);
+  cursor: pointer;
+}
+
+.peekOn {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}
+
+.peekMain {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.mini {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  width: 124px;
+  flex: none;
+  perspective: 500px;
+}
+
+.miniSingle {
+  width: 62px;
+}
+
+.miniPage {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  height: auto;
+  box-shadow: 0 0 0 1px var(--island-border, rgb(58 50 40 / 0.22));
+}
+
+.miniBlank {
+  aspect-ratio: 8.5 / 11;
+  background: var(--island-track);
+}
+
+/* Miniature page-turn echo: a light sheet sweeps the mini spread in the
+ * scrub direction while the preview moves. */
+.tickSheetFwd,
+.tickSheetBack {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(105deg,
+      rgb(255 255 255 / 0.22),
+      rgb(255 255 255 / 0.5),
+      rgb(255 255 255 / 0.22));
+  box-shadow: 0 0 0 1px var(--island-border);
+}
+
+.tickSheetFwd {
+  transform-origin: center;
+  animation: tickSweepFwd 170ms ease-in both;
+}
+
+.tickSheetBack {
+  transform-origin: center;
+  animation: tickSweepBack 170ms ease-in both;
+}
+
+@keyframes tickSweepFwd {
+  from {
+    opacity: 0.9;
+    transform: rotateY(0deg);
+  }
+
+  to {
+    opacity: 0.05;
+    transform: rotateY(-150deg);
+  }
+}
+
+@keyframes tickSweepBack {
+  from {
+    opacity: 0.9;
+    transform: rotateY(0deg);
+  }
+
+  to {
+    opacity: 0.05;
+    transform: rotateY(150deg);
+  }
+}
+
+.peekTxt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.peekCh {
+  font: 500 15px/1.25 var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.peekPg {
+  font: 500 12px/1.3 var(--font-ui);
+  color: var(--island-ink-soft, rgb(58 50 40 / 0.62));
+  font-variant-numeric: tabular-nums;
+}
+
+.peekD {
+  font: 600 12px/1.3 var(--font-ui);
+  color: var(--island-accent-soft, #b45309);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail {
+  position: relative;
+  height: 4px;
+  margin: 16px 2px 8px;
+  border-radius: 4px;
+  background: var(--island-track, rgb(58 50 40 / 0.16));
+}
+
+.railFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--island-accent, #b45309);
+  border-radius: 4px;
+}
+
+.railTick {
+  position: absolute;
+  top: -2px;
+  width: 1px;
+  height: 8px;
+  background: var(--island-ink-soft, rgb(58 50 40 / 0.62));
+  opacity: 0.55;
+}
+
+.railOrigin {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 12px;
+  background: var(--island-ink, #3a3228);
+  border-radius: 1px;
+}
+
+.railThumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--island-accent-soft, #b45309);
+  box-shadow: 0 0 0 3px var(--island-bg, rgb(245 239 226 / 0.97));
+}
+
+.peekHint {
+  font: 11.5px/1.3 var(--font-ui);
+  color: var(--island-ink-soft, rgb(58 50 40 / 0.62));
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
