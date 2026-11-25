@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MarkupTool } from '../types/models'
+import { percentForPage } from '../utils/time'
 import styles from './ReaderIsland.module.css'
 
 // How long the island stays open after the pointer (or the last click inside
@@ -7,12 +8,39 @@ import styles from './ReaderIsland.module.css'
 // deliberate settle instead of the old toolbar's instant snap.
 const COLLAPSE_GRACE_MS = 1000
 
+// Wheel-scrub timing (ported from the approved Reader Island prototype).
+// STOP_COMMIT_MS: the wheel must stay still this long before the previewed
+// position becomes one real turn. SOFT_COMMIT_MS: the same for single arrow
+// taps on the focused number, where another tap usually follows. A wheel
+// notch is ~100 units (deltaMode 0); velocity (units per ms, smoothed) is
+// raised to a power so fast scrolling skips further per notch than slow
+// scrolling — capped so one notch can never overshoot a whole chapter.
+const STOP_COMMIT_MS = 520
+const SOFT_COMMIT_MS = 650
+const WHEEL_PAGE_UNITS = 100
+const SCRUB_MAX_SKIP = 14
+
 type ReaderIslandProps = {
     pageNumber: number
     pageCount: number
     pageInput: string
+    // Label/step math needs the layout: spread mode pairs even-odd pages after
+    // the lone cover, so a scrub notch moves two pages and the previewed label
+    // reads "36 – 37".
+    spread: boolean
+    rangeLabel?: string
     onPageInputChange: (value: string) => void
     onPageCommit: () => void
+    // Wheel-scrub over the page-number area (and single arrow taps on the
+    // focused number): the island previews the target locally and only calls
+    // this ONCE, when the scrolling stops. getPagePreview renders a themed
+    // miniature for the card (cached by the reader); chapterLabelForPage names
+    // the outline section the previewed page sits in; railMarks are outline
+    // start pages drawn as ticks on the card's rail.
+    onScrubCommit?: (page: number) => void
+    getPagePreview?: (page: number) => Promise<string | null>
+    chapterLabelForPage?: (page: number) => string | null
+    railMarks?: number[]
     percent: number
     canPrev: boolean
     canNext: boolean
@@ -33,6 +61,17 @@ type ReaderIslandProps = {
     // composer, settings panel) holds the island open.
     held: boolean
     onExpandedChange?: (open: boolean) => void
+}
+
+// Book parity mirrored from ReaderScreen (cover sits alone, even verso on the
+// left): the pair — and therefore the label and progress anchor — for ANY
+// page, not just the live one. The scrub card and the pill's underline both
+// need this for the previewed position.
+function pairOf(page: number, spread: boolean, total: number): [number, number | null] {
+    if (!spread) return [Math.max(1, page), null]
+    const left = page <= 1 ? 1 : page % 2 === 0 ? page : page - 1
+    if (left === 1) return [1, null]
+    return [left, left + 1 <= total ? left + 1 : null]
 }
 
 const icons = {
@@ -102,8 +141,14 @@ export function ReaderIsland({
     pageNumber,
     pageCount,
     pageInput,
+    spread,
+    rangeLabel,
     onPageInputChange,
     onPageCommit,
+    onScrubCommit,
+    getPagePreview,
+    chapterLabelForPage,
+    railMarks,
     percent,
     canPrev,
     canNext,
@@ -129,6 +174,9 @@ export function ReaderIsland({
     const wasHeld = useRef(false)
     const lastPage = useRef(pageNumber)
     const [tick, setTick] = useState<'fwd' | 'back' | null>(null)
+    // Hover on the page-number zone (input + "/ total") arms the scroll hint
+    // under the pill — the discoverability cue for the wheel scrub.
+    const [pgHover, setPgHover] = useState(false)
 
     const cancelCollapse = useCallback(() => {
         window.clearTimeout(graceTimer.current)
@@ -171,6 +219,194 @@ export function ReaderIsland({
         return () => cancelAnimationFrame(raf)
     }, [pageNumber])
 
+    // ===== Wheel scrub (Change C from the approved prototype) =====
+    // The wheel over the page number does NOT turn pages directly. It opens a
+    // scrub: the pill's number and underline preview the target locally (with
+    // an origin marker where the scrub started), a card below the island shows
+    // real miniatures of the previewed spread, the chapter it sits in, how far
+    // it is from the start, and a rail with the outline's chapters. Faster
+    // scrolling skips further. When the scrolling stops, ONE real turn commits
+    // the previewed page; Esc cancels and puts the label back.
+    type Scrub = { fromPage: number; curPage: number }
+    const scrubRef = useRef<Scrub | null>(null)
+    const [scrub, setScrub] = useState<Scrub | null>(null)
+    const applyScrub = useCallback((next: Scrub | null) => {
+        scrubRef.current = next
+        setScrub(next)
+    }, [])
+    const commitTimer = useRef(0)
+    const wheelAcc = useRef(0)
+    const lastWheelAt = useRef(0)
+    const wheelSpeed = useRef(0)
+    // Latest-ref for the commit callback: the reader's handler identity can
+    // change (jumpToPage/attemptTurn depend on sequence and page), but the
+    // commit timer must always call the current one.
+    const scrubCommitRef = useRef(onScrubCommit)
+    scrubCommitRef.current = onScrubCommit
+    const miniRef = useRef<HTMLDivElement | null>(null)
+
+    const percentOf = useCallback(
+        (page: number) => {
+            const [left, right] = pairOf(page, spread, pageCount)
+            return percentForPage(spread ? right ?? left : left, Math.max(pageCount, 1))
+        },
+        [spread, pageCount],
+    )
+
+    const endScrub = useCallback(() => {
+        window.clearTimeout(commitTimer.current)
+        wheelAcc.current = 0
+        wheelSpeed.current = 0
+        applyScrub(null)
+    }, [applyScrub])
+
+    const commitScrub = useCallback(() => {
+        const active = scrubRef.current
+        endScrub()
+        if (!active || active.curPage === active.fromPage) return
+        scrubCommitRef.current?.(active.curPage)
+    }, [endScrub])
+
+    const scheduleCommit = useCallback(
+        (delay: number) => {
+            window.clearTimeout(commitTimer.current)
+            commitTimer.current = window.setTimeout(commitScrub, delay)
+        },
+        [commitScrub],
+    )
+
+    // Miniature sheet tick: a blank page sweeps across the card's mini spread
+    // in the scrub direction (capped at three concurrent), echoing the real
+    // page-turn that will land when the scrolling stops.
+    const tickMini = useCallback(
+        (dir: 1 | -1) => {
+            const mini = miniRef.current
+            if (!mini || !spread) return
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+            if (mini.querySelectorAll('[data-tick]').length > 2) return
+            const sheet = document.createElement('span')
+            sheet.setAttribute('data-tick', '')
+            sheet.className = dir > 0 ? styles.tickSheetFwd : styles.tickSheetBack
+            sheet.addEventListener('animationend', () => sheet.remove(), { once: true })
+            mini.appendChild(sheet)
+        },
+        [spread],
+    )
+
+    const move = useCallback(
+        (units: number, soft = false) => {
+            if (!units || pageCount < 1) return
+            const current = scrubRef.current ?? { fromPage: pageNumber, curPage: pageNumber }
+            const step = spread ? 2 : 1
+            const next = Math.max(1, Math.min(pageCount, current.curPage + units * step))
+            if (next !== current.curPage) {
+                applyScrub({ fromPage: current.fromPage, curPage: next })
+                tickMini(next > current.curPage ? 1 : -1)
+            }
+            scheduleCommit(soft ? SOFT_COMMIT_MS : STOP_COMMIT_MS)
+        },
+        [applyScrub, pageNumber, pageCount, spread, scheduleCommit, tickMini],
+    )
+
+    // Native non-passive listeners on the page-number zone (React's synthetic
+    // wheel is passive at the root, so preventDefault would not stick — the
+    // stage must not scroll while scrubbing). Same accumulator/velocity math
+    // as the prototype: whole notches move the preview; the exponent turns a
+    // fast stream into bigger skips.
+    const pgZoneWheel = useCallback(
+        (event: WheelEvent) => {
+            event.preventDefault()
+            const now = performance.now()
+            const dt = Math.max(8, now - lastWheelAt.current)
+            lastWheelAt.current = now
+            const d = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY
+            const inst = Math.abs(d) / dt
+            wheelSpeed.current = wheelSpeed.current * 0.6 + inst * 0.4
+            if (dt > 220) wheelSpeed.current = inst * 0.5
+            wheelAcc.current += d / WHEEL_PAGE_UNITS
+            const whole = Math.trunc(wheelAcc.current)
+            if (!whole) {
+                // Trickling below a notch: keep the card's settle timer alive so a
+                // slow drag across the number still ends in one commit, not many.
+                if (scrubRef.current) scheduleCommit(STOP_COMMIT_MS)
+                return
+            }
+            wheelAcc.current -= whole
+            const mult = 1 + Math.floor(Math.pow(wheelSpeed.current, 1.3) * 1.2)
+            move(whole * Math.min(mult, SCRUB_MAX_SKIP))
+        },
+        [move, scheduleCommit],
+    )
+
+    const pgRef = useRef<HTMLInputElement | null>(null)
+    const idleRef = useRef<HTMLSpanElement | null>(null)
+    useEffect(() => {
+        const els = [pgRef.current, idleRef.current].filter(
+            (el): el is HTMLElement => el != null,
+        )
+        els.forEach((el) => el.addEventListener('wheel', pgZoneWheel, { passive: false }))
+        return () => els.forEach((el) => el.removeEventListener('wheel', pgZoneWheel))
+    }, [pgZoneWheel])
+
+    // Esc cancels the scrub even when the input is not focused (wheel scrub):
+    // capture phase so it wins over the reader's own Escape (exit reader)
+    // while a preview is up, and never touches it otherwise.
+    useEffect(() => {
+        if (!scrub) return
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return
+            event.stopPropagation()
+            endScrub()
+        }
+        window.addEventListener('keydown', onKey, true)
+        return () => window.removeEventListener('keydown', onKey, true)
+    }, [scrub, endScrub])
+
+    useEffect(
+        () => () => {
+            window.clearTimeout(commitTimer.current)
+        },
+        [],
+    )
+
+    // Miniature previews for the card: the pair under the previewed page,
+    // rendered by the reader (themed + cached). The effect races only the
+    // newest target; stale results are dropped.
+    const [miniSrc, setMiniSrc] = useState<{ page: number; left: string | null; right: string | null } | null>(null)
+    const scrubTargetPage = scrub?.curPage ?? null
+    useEffect(() => {
+        if (scrubTargetPage == null || !getPagePreview) return
+        let cancelled = false
+        const [left, right] = pairOf(scrubTargetPage, spread, pageCount)
+        void (async () => {
+            const leftUrl = left != null ? await getPagePreview(left) : null
+            if (cancelled) return
+            const rightUrl = right != null ? await getPagePreview(right) : null
+            if (cancelled) return
+            setMiniSrc({ page: scrubTargetPage, left: leftUrl, right: rightUrl })
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [scrubTargetPage, spread, pageCount, getPagePreview])
+
+    const chapterTitle =
+        scrub != null && chapterLabelForPage ? chapterLabelForPage(scrub.curPage) : null
+    const scrubPair = scrub != null ? pairOf(scrub.curPage, spread, pageCount) : null
+    const scrubFromPair = scrub != null ? pairOf(scrub.fromPage, spread, pageCount) : null
+    const scrubLabel =
+        scrubPair != null
+            ? scrubPair[1] != null
+                ? `${scrubPair[0]} – ${scrubPair[1]}`
+                : `${scrubPair[0]}`
+            : ''
+    const scrubPercent = scrub != null ? percentOf(scrub.curPage) : null
+    const scrubFromPercent = scrub != null ? percentOf(scrub.fromPage) : null
+    const scrubDelta =
+        scrub != null && scrubFromPair != null && scrubPair != null
+            ? (scrubPair[1] ?? scrubPair[0]) - (scrubFromPair[1] ?? scrubFromPair[0])
+            : 0
+
     useEffect(() => () => window.clearTimeout(graceTimer.current), [])
 
     return (
@@ -197,29 +433,64 @@ export function ReaderIsland({
                 if (!held) scheduleCollapse()
             }}
         >
-            <div className={`${styles.island} ${open ? styles.open : ''}`}>
-                <input
-                    className={`${styles.pg} ${tick === 'fwd' ? styles.tickFwd : ''} ${tick === 'back' ? styles.tickBack : ''}`}
-                    value={pageInput}
-                    onChange={(event) => onPageInputChange(event.target.value)}
-                    onBlur={onPageCommit}
-                    // Select the whole label on focus so typing replaces the
-                    // range ("34–35") instead of editing inside it.
-                    onFocus={(event) => event.currentTarget.select()}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                            event.preventDefault()
-                            onPageCommit()
-                        }
-                    }}
-                    aria-label="Page number"
-                    style={{
-                        width: `${Math.max(2, String(pageCount).length, pageInput.length) + 0.6}ch`,
-                    }}
-                />
-                <span className={styles.idleExpander}>
-                    <span className={styles.idleClip}>
-                        <span className={styles.tot}>/ {pageCount}</span>
+            <div
+                className={`${styles.island} ${open ? styles.open : ''} ${scrub ? styles.scrubbing : ''}`}
+            >
+                <span className={styles.pgZone}>
+                    <input
+                        ref={pgRef}
+                        className={`${styles.pg} ${tick === 'fwd' ? styles.tickFwd : ''} ${tick === 'back' ? styles.tickBack : ''}`}
+                        value={scrub ? scrubLabel : pageInput}
+                        onChange={(event) => {
+                            if (scrub) endScrub()
+                            onPageInputChange(event.target.value)
+                        }}
+                        onFocus={() => {
+                            if (scrub) endScrub()
+                        }}
+                        onBlur={() => {
+                            if (scrub) commitScrub()
+                            else onPageCommit()
+                        }}
+                        onMouseEnter={() => setPgHover(true)}
+                        onMouseLeave={() => setPgHover(false)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault()
+                                if (scrub) commitScrub()
+                                else onPageCommit()
+                            } else if (event.key === 'ArrowDown') {
+                                // Arrow taps on the focused number scrub too (soft commit —
+                                // a second tap usually follows before the settle timer ends).
+                                event.preventDefault()
+                                move(1, true)
+                            } else if (event.key === 'ArrowUp') {
+                                event.preventDefault()
+                                move(-1, true)
+                            } else if (event.key === 'Escape' && scrub) {
+                                event.stopPropagation()
+                                endScrub()
+                            }
+                        }}
+                        aria-label="Page number"
+                        style={{
+                            width: scrub
+                                ? `${scrubLabel.length + 1}ch`
+                                : `${Math.max(2, String(pageCount).length) + 1}ch`,
+                        }}
+                    />
+                    <span className={styles.idleExpander} ref={idleRef}>
+                        <span
+                            className={styles.idleClip}
+                            onMouseEnter={() => setPgHover(true)}
+                            onMouseLeave={() => setPgHover(false)}
+                        >
+                            {!scrub && rangeLabel ? <span className={styles.tot}>{rangeLabel}</span> : null}
+                            <span className={styles.tot}>/ {pageCount}</span>
+                            <span className={styles.track}>
+                                <i style={{ width: `${scrubPercent ?? percent}%` }} />
+                            </span>
+                        </span>
                     </span>
                 </span>
                 <span className={styles.expandExpander}>
@@ -278,8 +549,75 @@ export function ReaderIsland({
                     </span>
                 </span>
                 <span className={styles.iline}>
-                    <i style={{ width: `${percent}%` }} />
+                    <i style={{ width: `${scrubPercent ?? percent}%` }} />
+                    {scrub && scrubFromPercent != null ? (
+                        <b className={styles.ilineOrigin} style={{ left: `${scrubFromPercent}%` }} />
+                    ) : null}
                 </span>
+            </div>
+            <div className={`${styles.tip} ${pgHover && !scrub ? styles.tipOn : ''}`}>
+                Scroll over the number to flip fast
+            </div>
+            <div
+                className={`${styles.peek} ${scrub ? styles.peekOn : ''}`}
+                aria-hidden={!scrub}
+                onClick={() => {
+                    if (scrub) commitScrub()
+                }}
+            >
+                <div className={styles.peekMain}>
+                    <div
+                        className={`${styles.mini} ${spread ? '' : styles.miniSingle}`}
+                        ref={miniRef}
+                    >
+                        {miniSrc?.left ? (
+                            <img className={styles.miniPage} src={miniSrc.left} alt="" />
+                        ) : (
+                            <span className={`${styles.miniPage} ${styles.miniBlank}`} />
+                        )}
+                        {spread ? (
+                            miniSrc?.right ? (
+                                <img className={styles.miniPage} src={miniSrc.right} alt="" />
+                            ) : (
+                                <span className={`${styles.miniPage} ${styles.miniBlank}`} />
+                            )
+                        ) : null}
+                    </div>
+                    <div className={styles.peekTxt}>
+                        {chapterTitle ? <div className={styles.peekCh}>{chapterTitle}</div> : null}
+                        <div className={styles.peekPg}>
+                            Page {scrubLabel || '–'} of {pageCount}
+                        </div>
+                        <div className={styles.peekD}>
+                            {scrubDelta === 0
+                                ? 'Where you started'
+                                : `${scrubDelta > 0 ? '+' : '−'}${Math.abs(scrubDelta)} pages from ${scrubFromPair != null ? scrubFromPair[0] : scrub?.fromPage ?? ''
+                                }`}
+                        </div>
+                    </div>
+                </div>
+                <div className={styles.rail}>
+                    <i className={styles.railFill} style={{ width: `${scrubPercent ?? 0}%` }} />
+                    {(railMarks ?? []).map((mark) => {
+                        const [, right] = pairOf(mark, spread, pageCount)
+                        const anchor = spread ? right ?? mark : mark
+                        return (
+                            <i
+                                key={mark}
+                                className={styles.railTick}
+                                style={{ left: `${percentForPage(anchor, Math.max(pageCount, 1))}%` }}
+                            />
+                        )
+                    })}
+                    {scrubFromPercent != null ? (
+                        <i className={styles.railOrigin} style={{ left: `${scrubFromPercent}%` }} />
+                    ) : null}
+                    <i className={styles.railThumb} style={{ left: `${scrubPercent ?? 0}%` }} />
+                </div>
+                <div className={styles.peekHint}>
+                    <span>Stop scrolling to jump</span>
+                    <span>Esc cancels</span>
+                </div>
             </div>
         </div>
     )

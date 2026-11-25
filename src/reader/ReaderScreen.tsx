@@ -63,17 +63,6 @@ const SPREAD_GAP = 0 // the two sheets meet at the spine; the gutter overlay sha
 // left, odd recto on the right, cover on its own).
 const leftPageOf = (page: number) => (page <= 1 || page % 2 === 0 ? page : page - 1)
 
-// What the island's editable field shows. Single-page mode is just the page;
-// spread mode shows the pair ("34–35") so the number matches what is on the
-// desk; the lone cover stays "1" because it has no facing page. The value is
-// still parseable: commitPage reads the first integer out of it.
-function pageLabelOf(page: number, spread: boolean, total: number): string {
-  if (!spread) return String(page)
-  const left = leftPageOf(page)
-  const right = left === 1 ? null : left + 1 <= total ? left + 1 : null
-  return right == null ? String(left) : `${left}–${right}`
-}
-
 export function ReaderScreen() {
   const {
     activeBookId,
@@ -180,15 +169,15 @@ export function ReaderScreen() {
       pageRef.current = page
       setSequenceIndex(clamped)
       setPageNumber(page)
-      // In spread mode the pill shows the whole pair (36–37); the cover is
-      // alone. pageNumber itself stays the canonical stored page.
-      setPageInput(pageLabelOf(page, spreadRef.current, pageCount))
+      // In spread mode the pill's editable number is the LEFT page of the
+      // pair, matching what the island displays (36 – 37).
+      setPageInput(String(spreadRef.current ? leftPageOf(page) : page))
       lastSelection.current = null
       setPendingAnnotation(null)
       setActiveAnnotationId(null)
       void persistProgress(page, clamped)
     },
-    [pageCount, persistProgress, sequence],
+    [persistProgress, sequence],
   )
 
   useEffect(() => {
@@ -237,7 +226,7 @@ export function ReaderScreen() {
       pageRef.current = page
       setSequenceIndex(index)
       setPageNumber(page)
-      setPageInput(pageLabelOf(page, spreadRef.current, count))
+      setPageInput(String(page))
       if (stored && page > 1) {
         showHint(`Resumed at page ${page} of ${count}`)
       }
@@ -268,8 +257,8 @@ export function ReaderScreen() {
         singleScaleRef.current = restored
         setScale(restored)
         scaleRef.current = restored
-        // In spread mode the pill shows the whole restored pair.
-        setPageInput(pageLabelOf(page, spreadRef.current, count))
+        // In spread mode the pill shows the left page of the restored pair.
+        setPageInput(String(spreadRef.current ? leftPageOf(page) : page))
       }
 
       setEngineReady(true)
@@ -327,6 +316,10 @@ export function ReaderScreen() {
     // sheet on empty background instead of the slot the new page takes.
     glide: number
     box: { left: number; top: number; width: number; height: number }
+    // Wheel-burst turns (queued behind the lock while the user keeps
+    // scrolling) run a shorter flip so a fast skim chains quickly instead of
+    // queueing full-length 700ms turns.
+    fast?: boolean
   }
   const [turn, setTurn] = useState<TurnState | null>(null)
   const turnLockRef = useRef(false)
@@ -418,7 +411,7 @@ export function ReaderScreen() {
   }
 
   const attemptTurn = useCallback(
-    async (dir: 1 | -1) => {
+    async (dir: 1 | -1, fast = false) => {
       const step = spreadRef.current ? 2 : 1
       const target = Math.max(
         0,
@@ -503,6 +496,7 @@ export function ReaderScreen() {
           dir,
           slot: slot.slot,
           glide,
+          fast,
           frontSrc: frontSrc ?? backSrc ?? '',
           backSrc: backSrc ?? frontSrc ?? '',
           box: { left: slot.left, top: slot.top, width: slot.width, height: slot.height },
@@ -542,7 +536,7 @@ export function ReaderScreen() {
         { transform: 'translateX(0px) rotateY(0deg)' },
         { transform: `translateX(${turn.glide}px) rotateY(${to}deg)` },
       ],
-      { duration: 700, easing: 'cubic-bezier(.45,.05,.32,1)', fill: 'forwards' },
+      { duration: turn.fast ? 340 : 700, easing: 'cubic-bezier(.45,.05,.32,1)', fill: 'forwards' },
     )
     turnAnimRef.current = anim
     let finished = false
@@ -655,6 +649,27 @@ export function ReaderScreen() {
   const onPrev = useCallback(() => void attemptTurn(-1), [attemptTurn])
   const onNext = useCallback(() => void attemptTurn(1), [attemptTurn])
 
+  // Themed miniatures for the island's wheel-scrub preview card. Same
+  // pipeline as the turn faces (renderPageSnapshot → bakeFace) at a fixed
+  // small scale, cached per page so a fast scrub renders each spread once;
+  // a generation counter drops results for targets the user already
+  // scrolled past.
+  const previewCacheRef = useRef<Map<number, string>>(new Map())
+  const previewSeqRef = useRef(0)
+  const getPagePreview = useCallback(async (page: number): Promise<string | null> => {
+    const cache = previewCacheRef.current
+    const cached = cache.get(page)
+    if (cached) return cached
+    const seq = ++previewSeqRef.current
+    const url = await renderPageSnapshot(page, 0.2)
+    if (cache.size >= 160) {
+      const oldest = cache.keys().next().value
+      if (oldest !== undefined) cache.delete(oldest)
+    }
+    if (url) cache.set(page, url)
+    return seq === previewSeqRef.current ? url : null
+  }, [])
+
   const changeScale = useCallback(
     (next: number) => {
       const floor = spread ? SPREAD_MIN_SCALE : MIN_SCALE
@@ -746,9 +761,6 @@ export function ReaderScreen() {
   const toggleSpread = useCallback(() => {
     const next = !spread
     setSpread(next)
-    // The field's label depends on the layout: a pair when spread turns on,
-    // a single page when it turns off. Keep it in step immediately.
-    setPageInput(pageLabelOf(pageRef.current, next, pageCount))
     try {
       window.localStorage.setItem('folio.spread', next ? '1' : '0')
     } catch {
@@ -767,7 +779,7 @@ export function ReaderScreen() {
       void persistProgress(pageRef.current, sequenceIndexRef.current, clamped)
     }
     showHint(next ? 'Two-page spread on' : 'Two-page spread off')
-  }, [pageCount, persistProgress, scale, showHint, spread])
+  }, [persistProgress, scale, showHint, spread])
 
   const exitChrome = useCallback(() => {
     if (document.fullscreenElement) {
@@ -899,18 +911,73 @@ export function ReaderScreen() {
   const commitPage = () => {
     const next = Number.parseInt(pageInput, 10)
     if (!Number.isFinite(next)) {
-      setPageInput(pageLabelOf(pageNumber, spread, pageCount))
-      return
-    }
-    // A spread's label parses to its left page. Blurring an unchanged field
-    // must not move the canonical page off the right-hand sheet — that would
-    // flip the bookmark state for a spread the reader never left.
-    if (spread && (next === leftPage || next === rightPage)) {
-      setPageInput(pageLabelOf(pageNumber, spread, pageCount))
+      setPageInput(String(pageNumber))
       return
     }
     jumpToPage(next)
   }
+
+  // Scrub commit: the island previews while the wheel (or arrow taps on the
+  // focused number) moves, then hands over ONE target page when the
+  // scrolling stops. A one-step move gets the same animated sheet flip as
+  // the prev/next buttons; anything further jumps straight to the previewed
+  // page — the card already showed exactly that spread. While a turn is
+  // still in flight the commit waits for the lock instead of fighting the
+  // flipper's pending page change (the 1.6s safety net bounds the wait).
+  const onScrubCommit = useCallback(
+    (page: number) => {
+      const step = spreadRef.current ? 2 : 1
+      const dir: 1 | -1 = page >= pageRef.current ? 1 : -1
+      const oneStep = Math.abs(page - pageRef.current) === step
+      const tryCommit = () => {
+        if (turnLockRef.current) {
+          window.setTimeout(tryCommit, 90)
+          return
+        }
+        if (
+          oneStep &&
+          spreadRef.current &&
+          !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ) {
+          void attemptTurn(dir)
+          return
+        }
+        jumpToPage(page)
+      }
+      tryCommit()
+    },
+    [attemptTurn, jumpToPage],
+  )
+
+  // Outline context for the scrub card: the section title the previewed page
+  // sits in (the last outline entry at-or-before the page; the deepest one
+  // wins on a shared start page) and the chapter start pages drawn as ticks
+  // on the card's rail. Books without an outline just get no chapter line
+  // and no ticks.
+  const chapterLabelForPage = useCallback(
+    (page: number): string | null => {
+      let best: OutlineEntry | null = null
+      for (const entry of outline) {
+        if (entry.pageNumber > page) continue
+        if (
+          !best ||
+          entry.pageNumber > best.pageNumber ||
+          (entry.pageNumber === best.pageNumber && entry.depth > best.depth)
+        ) {
+          best = entry
+        }
+      }
+      return best ? best.title : null
+    },
+    [outline],
+  )
+  const railMarks = useMemo(
+    () =>
+      outline
+        .filter((entry) => entry.depth <= 1 && entry.pageNumber > 1)
+        .map((entry) => entry.pageNumber),
+    [outline],
+  )
 
   // Clicking the page (anything outside the island) dismisses the settings
   // panel; the island then folds after its grace window once the hold clears.
@@ -1006,6 +1073,12 @@ export function ReaderScreen() {
           }
           onPrev={onPrev}
           onNext={onNext}
+          spread={spread}
+          rangeLabel={spread && rightPage ? `– ${rightPage}` : undefined}
+          onScrubCommit={onScrubCommit}
+          getPagePreview={getPagePreview}
+          chapterLabelForPage={chapterLabelForPage}
+          railMarks={railMarks}
           onLibrary={() => {
             void persistProgress(pageRef.current, sequenceIndexRef.current)
             closeReader('library')
