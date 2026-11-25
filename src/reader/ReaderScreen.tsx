@@ -63,6 +63,17 @@ const SPREAD_GAP = 0 // the two sheets meet at the spine; the gutter overlay sha
 // left, odd recto on the right, cover on its own).
 const leftPageOf = (page: number) => (page <= 1 || page % 2 === 0 ? page : page - 1)
 
+// What the island's editable field shows. Single-page mode is just the page;
+// spread mode shows the pair ("34–35") so the number matches what is on the
+// desk; the lone cover stays "1" because it has no facing page. The value is
+// still parseable: commitPage reads the first integer out of it.
+function pageLabelOf(page: number, spread: boolean, total: number): string {
+  if (!spread) return String(page)
+  const left = leftPageOf(page)
+  const right = left === 1 ? null : left + 1 <= total ? left + 1 : null
+  return right == null ? String(left) : `${left}–${right}`
+}
+
 export function ReaderScreen() {
   const {
     activeBookId,
@@ -169,15 +180,15 @@ export function ReaderScreen() {
       pageRef.current = page
       setSequenceIndex(clamped)
       setPageNumber(page)
-      // In spread mode the pill's editable number is the LEFT page of the
-      // pair, matching what the island displays (36 – 37).
-      setPageInput(String(spreadRef.current ? leftPageOf(page) : page))
+      // In spread mode the pill shows the whole pair (36–37); the cover is
+      // alone. pageNumber itself stays the canonical stored page.
+      setPageInput(pageLabelOf(page, spreadRef.current, pageCount))
       lastSelection.current = null
       setPendingAnnotation(null)
       setActiveAnnotationId(null)
       void persistProgress(page, clamped)
     },
-    [persistProgress, sequence],
+    [pageCount, persistProgress, sequence],
   )
 
   useEffect(() => {
@@ -226,7 +237,7 @@ export function ReaderScreen() {
       pageRef.current = page
       setSequenceIndex(index)
       setPageNumber(page)
-      setPageInput(String(page))
+      setPageInput(pageLabelOf(page, spreadRef.current, count))
       if (stored && page > 1) {
         showHint(`Resumed at page ${page} of ${count}`)
       }
@@ -257,8 +268,8 @@ export function ReaderScreen() {
         singleScaleRef.current = restored
         setScale(restored)
         scaleRef.current = restored
-        // In spread mode the pill shows the left page of the restored pair.
-        setPageInput(String(spreadRef.current ? leftPageOf(page) : page))
+        // In spread mode the pill shows the whole restored pair.
+        setPageInput(pageLabelOf(page, spreadRef.current, count))
       }
 
       setEngineReady(true)
@@ -735,6 +746,9 @@ export function ReaderScreen() {
   const toggleSpread = useCallback(() => {
     const next = !spread
     setSpread(next)
+    // The field's label depends on the layout: a pair when spread turns on,
+    // a single page when it turns off. Keep it in step immediately.
+    setPageInput(pageLabelOf(pageRef.current, next, pageCount))
     try {
       window.localStorage.setItem('folio.spread', next ? '1' : '0')
     } catch {
@@ -753,7 +767,7 @@ export function ReaderScreen() {
       void persistProgress(pageRef.current, sequenceIndexRef.current, clamped)
     }
     showHint(next ? 'Two-page spread on' : 'Two-page spread off')
-  }, [persistProgress, scale, showHint, spread])
+  }, [pageCount, persistProgress, scale, showHint, spread])
 
   const exitChrome = useCallback(() => {
     if (document.fullscreenElement) {
@@ -885,7 +899,14 @@ export function ReaderScreen() {
   const commitPage = () => {
     const next = Number.parseInt(pageInput, 10)
     if (!Number.isFinite(next)) {
-      setPageInput(String(pageNumber))
+      setPageInput(pageLabelOf(pageNumber, spread, pageCount))
+      return
+    }
+    // A spread's label parses to its left page. Blurring an unchanged field
+    // must not move the canonical page off the right-hand sheet — that would
+    // flip the bookmark state for a spread the reader never left.
+    if (spread && (next === leftPage || next === rightPage)) {
+      setPageInput(pageLabelOf(pageNumber, spread, pageCount))
       return
     }
     jumpToPage(next)
