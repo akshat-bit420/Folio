@@ -50,3 +50,18 @@
 :global([data-theme='dark']) .annotationActive {
   background-color: rgb(245 158 11 / 0.34);
 }
+
+/* Lamplight: multiply on the warm cream page so amber highlight / annotation
+   washes darken the paper naturally instead of washing colors out. */
+:global([data-theme='lamplight']) .layer {
+  mix-blend-mode: multiply;
+}
+
+:global([data-theme='lamplight']) .annotation {
+  border-bottom-color: var(--annotation);
+}
+
+:global([data-theme='lamplight']) .annotation:hover,
+:global([data-theme='lamplight']) .annotationActive {
+  background-color: rgb(217 138 67 / 0.44);
+}

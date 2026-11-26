@@ -1,4 +1,4 @@
-export type ThemeId = 'kindle' | 'dark'
+export type ThemeId = 'kindle' | 'dark' | 'lamplight'
 
 export type AppView = 'library' | 'notes' | 'activity' | 'reader'
 

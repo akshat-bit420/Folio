@@ -91,6 +91,37 @@
     inset 0 1px 0 rgb(244 236 216 / 0.08);
 }
 
+/* Lamplight: deep warm oiled-leather cover so the spread reads as a physical
+   book lying in a dark room, with darker page edges so nothing glares. */
+:global([data-theme='lamplight']) .bookCover {
+  background: linear-gradient(158deg, #261b13 0%, #17100b 52%, #0d0906 100%);
+  box-shadow:
+    0 30px 70px rgb(0 0 0 / 0.6),
+    0 6px 18px rgb(0 0 0 / 0.45),
+    inset 0 1px 0 rgb(232 208 178 / 0.06);
+}
+
+:global([data-theme='lamplight']) .bookBlock {
+  background: #2a1f15;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+}
+
+:global([data-theme='lamplight']) .stackTop,
+:global([data-theme='lamplight']) .stackBot {
+  background: repeating-linear-gradient(180deg,
+      #2e2218 0 2.5px,
+      #241a10 2.5px 3.5px,
+      #1a120a 3.5px 4.5px);
+}
+
+:global([data-theme='lamplight']) .stackSideL,
+:global([data-theme='lamplight']) .stackSideR {
+  background: repeating-linear-gradient(90deg,
+      #2e2218 0 2.5px,
+      #241a10 2.5px 3.5px,
+      #1a120a 3.5px 4.5px);
+}
+
 /* The stacked sheet block: a cream slab slightly larger than the pages,
    with per-sheet hairlines only in its exposed edges. Middle stays plain
    — the live pages cover it anyway. */

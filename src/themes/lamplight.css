@@ -1,0 +1,48 @@
+/* Lamplight — warm page, dark room.
+ *
+ * Dark espresso room with brown leather book edges, but the page sheet
+ * stays warm cream so PDF colors, charts, and graphs render naturally.
+ * No canvas inversion or grayscale — content colors are preserved.
+ */
+:root[data-theme='lamplight'] {
+    --surface: #120e0b;
+    --paper: #decfb6;
+    /* lighter warm cream — matches Image 2 look */
+    --pdf-paper: #decfb6;
+    /* IDENTICAL to --paper — no white flash */
+    --ink: #e4d3bc;
+    /* light ink on dark library surface */
+    --ink-soft: #9c8974;
+    --chrome: #18130f;
+    --chrome-hover: #261e18;
+    --border: rgb(58 50 40 / 0.12);
+    --border-strong: rgb(58 50 40 / 0.2);
+    --progress: #d98a43;
+    --progress-track: rgb(58 50 40 / 0.1);
+    --highlight: rgb(217 138 67 / 0.35);
+    --annotation: #d98a43;
+    --annotation-wash: rgb(217 138 67 / 0.25);
+    --accent-active: #d98a43;
+    --accent-active-bg: rgb(217 138 67 / 0.15);
+    --accent-active-border: rgb(217 138 67 / 0.38);
+    --bookmark-active: #e06c65;
+    --bookmark-active-bg: rgb(224 108 101 / 0.16);
+    --hint: rgb(58 50 40 / 0.72);
+    --danger: #e06c65;
+    --shadow: 0 0 0 1px rgb(58 50 40 / 0.06), 0 18px 44px rgb(0 0 0 / 0.4);
+    --font-ui: 'Segoe UI', system-ui, sans-serif;
+    --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
+}
+
+:root[data-theme='lamplight'] {
+    --island-bg: rgb(26 20 15 / 0.94);
+    --island-border: rgb(232 208 178 / 0.12);
+    --island-ink: #ead9c3;
+    --island-ink-soft: rgb(234 217 195 / 0.55);
+    --island-track: rgb(234 217 195 / 0.20);
+    --island-sep: rgb(234 217 195 / 0.15);
+    --island-hover-bg: rgb(234 217 195 / 0.10);
+    --island-accent: #d98a43;
+    --island-accent-soft: #ebb074;
+    --island-shadow: 0 6px 22px rgb(0 0 0 / 0.55), 0 1px 3px rgb(0 0 0 / 0.6);
+}

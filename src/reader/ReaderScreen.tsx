@@ -369,14 +369,39 @@ export function ReaderScreen() {
     }
   }
 
+  // // The theme look is baked into the face pixels at capture time instead of
+  // // applied via CSS: a CSS filter on an element inside the flipper's 3D
+  // // preserve-3d subtree is dropped by GPU compositors once the face flips
+  // // past 90°, which flashed raw paper mid-turn. Same strings as
+  // // PdfViewport.module.css, so the faces match the live pages exactly.
+  // const DARK_FACE_FILTER =
+  //   'grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95)'
+  // const LIGHT_FACE_FILTER = 'grayscale(100%) contrast(1.55) brightness(0.92)'
+
+  // const bakeFace = (source: HTMLCanvasElement, w: number, h: number): string => {
+  //   const out = document.createElement('canvas')
+  //   out.width = w
+  //   out.height = h
+  //   const ctx = out.getContext('2d')
+  //   if (!ctx) return ''
+  //   ctx.filter =
+  //     document.documentElement.dataset.theme === 'dark' ? DARK_FACE_FILTER : LIGHT_FACE_FILTER
+  //   ctx.drawImage(source, 0, 0, w, h)
+  //   return out.toDataURL('image/png')
+  // }
+
   // The theme look is baked into the face pixels at capture time instead of
   // applied via CSS: a CSS filter on an element inside the flipper's 3D
   // preserve-3d subtree is dropped by GPU compositors once the face flips
   // past 90°, which flashed raw paper mid-turn. Same strings as
   // PdfViewport.module.css, so the faces match the live pages exactly.
-  const DARK_FACE_FILTER =
-    'grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95)'
-  const LIGHT_FACE_FILTER = 'grayscale(100%) contrast(1.55) brightness(0.92)'
+  const FACE_FILTERS: Record<string, string> = {
+    kindle: 'grayscale(100%) contrast(1.55) brightness(0.92)',
+    dark: 'grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95)',
+    // Lamplight — very gentle warmth so page-turn faces don't flash white,
+    // but charts and photos still keep their real colors.
+    lamplight: 'sepia(0.12) saturate(1.05) brightness(0.98)',
+  }
 
   const bakeFace = (source: HTMLCanvasElement, w: number, h: number): string => {
     const out = document.createElement('canvas')
@@ -384,8 +409,8 @@ export function ReaderScreen() {
     out.height = h
     const ctx = out.getContext('2d')
     if (!ctx) return ''
-    ctx.filter =
-      document.documentElement.dataset.theme === 'dark' ? DARK_FACE_FILTER : LIGHT_FACE_FILTER
+    const theme = document.documentElement.dataset.theme ?? 'kindle'
+    ctx.filter = FACE_FILTERS[theme] ?? FACE_FILTERS.kindle
     ctx.drawImage(source, 0, 0, w, h)
     return out.toDataURL('image/png')
   }
@@ -1131,6 +1156,18 @@ export function ReaderScreen() {
             >
               Dark e-ink
               <span className={styles.themeOptionSub}>True-black room, visible page sheet</span>
+            </button>
+            <button
+              type="button"
+              className={
+                theme === 'lamplight'
+                  ? `${styles.themeOption} ${styles.themeOptionActive}`
+                  : styles.themeOption
+              }
+              onClick={() => setTheme('lamplight')}
+            >
+              Lamplight
+              <span className={styles.themeOptionSub}>Warm tungsten, low-glare night</span>
             </button>
             <p className={styles.settingsLabel}>Layout</p>
             <button

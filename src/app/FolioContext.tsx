@@ -68,13 +68,21 @@ export function FolioProvider({ children }: { children: ReactNode }) {
   const [activeBookId, setActiveBookId] = useState<string | null>(null)
   const [theme, setThemeState] = useState<ThemeId>('kindle')
 
-  // Restore the persisted theme once; getTheme() falls back to 'kindle'
-  // when nothing has been stored yet.
+  // // Restore the persisted theme once; getTheme() falls back to 'kindle'
+  // // when nothing has been stored yet.
+  // useEffect(() => {
+  //   void metaRepo
+  //     .getTheme()
+  //     .then((stored) => setThemeState(stored === 'dark' ? 'dark' : 'kindle'))
+  //     .catch(() => { })
+  // }, [])
+
+  // Restore the persisted theme once. getTheme() already returns a valid
+  // ThemeId (defaulting to 'kindle' when nothing is stored), so any persisted
+  // value — including 'lamplight' — restores cleanly instead of collapsing to
+  // 'kindle'.
   useEffect(() => {
-    void metaRepo
-      .getTheme()
-      .then((stored) => setThemeState(stored === 'dark' ? 'dark' : 'kindle'))
-      .catch(() => { })
+    void metaRepo.getTheme().then(setThemeState).catch(() => { })
   }, [])
 
   // Keep <html data-theme> in sync — every theme file and module override

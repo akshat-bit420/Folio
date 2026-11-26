@@ -53,6 +53,18 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Lamplight — zero-blue-light night. Same pipeline as dark (warm paper */
+/* + dark ink painted by the engine, then the canvas filter inverts +   */
+/* tints into a warm matte page), but with a stronger tungsten cast and */
+/* no multiply over the dark page (that would muddy to black).          */
+/* ------------------------------------------------------------------ */
+:global([data-theme='lamplight']) .canvas {
+  filter: none;
+  mix-blend-mode: multiply;
+  background: var(--paper);
+}
+
+/* ------------------------------------------------------------------ */
 /* Page-turn animation. Runs on the page container after the render    */
 /* pipeline has already switched pages, so it never delays painting.   */
 /*                                                                     */

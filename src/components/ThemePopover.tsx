@@ -38,6 +38,7 @@ import styles from './ThemePopover.module.css'
 const THEME_OPTIONS: Array<{ id: ThemeId; label: string; description: string }> = [
   { id: 'kindle', label: 'Kindle', description: 'Warm e-ink monochrome' },
   { id: 'dark', label: 'Dark e-ink', description: 'Floating text, no page edges' },
+  { id: 'lamplight', label: 'Lamplight', description: 'Warm page, dark room' },
 ]
 
 export function ThemePopover() {
