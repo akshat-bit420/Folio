@@ -10,8 +10,12 @@
 .canvas {
   display: block;
   background: var(--paper);
-  /*filter for kindle theme*/
-  filter: grayscale(100%) contrast(1.55) brightness(0.92);
+  /* No filter here on purpose: the base page must render exactly what the
+     engine painted, so text keeps its original sharpness in every theme.
+     The old blanket chain (grayscale + contrast(1.55) + brightness) crushed
+     the anti-aliased gray pixels that carry glyph edges and read as "low
+     resolution text". Each theme opts into its own treatment below — a new
+     theme that declares none of them simply shows the original page. */
   /*2. mix blend mode*/
   mix-blend-mode: multiply;
 }
@@ -38,25 +42,42 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Kindle e-ink theme. The e-ink identity is luminance-only, so it     */
+/* keeps grayscale(100%) — that remaps color to gray without touching  */
+/* glyph geometry (black ink is unaffected). The old contrast(1.55)    */
+/* brightness(0.92) chain is gone: contrast > 1 snaps the anti-aliased */
+/* edge pixels of every glyph to pure black/white, which is exactly    */
+/* the "dull, low resolution" text this file used to produce.          */
+/* ------------------------------------------------------------------ */
+:global([data-theme='kindle']) .canvas {
+  filter: grayscale(100%);
+  mix-blend-mode: multiply;
+}
+
+/* ------------------------------------------------------------------ */
 /* Dark e-ink theme ("Emerald Depth"). The engine still paints warm    */
 /* paper + dark ink; this filter inverts the rendered page's luminance,*/
-/* turning the canvas into warm near-black paper (#151413) with warm   */
-/* off-white text (#f2f2ee). themes/dark.css sets the room (--surface) */
-/* to the palette's deep teal #0f2027 and supplies --shadow, so the    */
-/* page reads as a visible warm sheet lying in a cool room instead of  */
-/* edgeless floating text. mix-blend-mode goes back to normal —        */
-/* multiply over a dark page would push everything to pure black.      */
+/* turning the canvas into warm near-black paper with off-white text.  */
+/* It is a SMART invert now: invert(1) flips luminance and             */
+/* hue-rotate(180deg) rotates every hue back around the wheel, so      */
+/* colored content (links, charts, figures) keeps approximately its    */
+/* original hue instead of becoming gray mush. Grayscale, contrast and */
+/* the double brightness dimming are gone — they were flattening and   */
+/* crushing the text's anti-aliased edges. mix-blend-mode goes back to */
+/* normal — multiply over a dark page would push everything to black.  */
 /* ------------------------------------------------------------------ */
 :global([data-theme='dark']) .canvas {
-  filter: grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95);
+  filter: invert(1) hue-rotate(180deg);
   mix-blend-mode: normal;
 }
 
 /* ------------------------------------------------------------------ */
-/* Lamplight — zero-blue-light night. Same pipeline as dark (warm paper */
-/* + dark ink painted by the engine, then the canvas filter inverts +   */
-/* tints into a warm matte page), but with a stronger tungsten cast and */
-/* no multiply over the dark page (that would muddy to black).          */
+/* Lamplight — warm page, dark room. Zero-blue-light night that keeps  */
+/* content colors: the engine's warm cream page (--pdf-paper #decfb6)  */
+/* is shown as painted — NO filter, no invert, no grayscale — only the */
+/* multiply blend tints unpainted whites toward the theme's paper tone */
+/* (text and charts stay original). multiply must stay (not normal):   */
+/* without it the canvas whites would glare against the espresso room. */
 /* ------------------------------------------------------------------ */
 :global([data-theme='lamplight']) .canvas {
   filter: none;

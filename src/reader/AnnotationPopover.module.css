@@ -71,3 +71,17 @@
 .danger {
   color: var(--danger);
 }
+
+/* ------------------------------------------------------------------
+   Lamplight: same input-well fix as the composer — var(--paper) is the
+   light page tone here, so the editor needs the dark raised surface
+   for the light --ink to stay readable while editing. */
+:global([data-theme='lamplight']) .editor {
+  background: var(--chrome-hover);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+:global([data-theme='lamplight']) .editor::placeholder {
+  color: var(--ink-soft);
+} 

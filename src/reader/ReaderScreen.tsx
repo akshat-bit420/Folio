@@ -369,38 +369,20 @@ export function ReaderScreen() {
     }
   }
 
-  // // The theme look is baked into the face pixels at capture time instead of
-  // // applied via CSS: a CSS filter on an element inside the flipper's 3D
-  // // preserve-3d subtree is dropped by GPU compositors once the face flips
-  // // past 90°, which flashed raw paper mid-turn. Same strings as
-  // // PdfViewport.module.css, so the faces match the live pages exactly.
-  // const DARK_FACE_FILTER =
-  //   'grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95)'
-  // const LIGHT_FACE_FILTER = 'grayscale(100%) contrast(1.55) brightness(0.92)'
-
-  // const bakeFace = (source: HTMLCanvasElement, w: number, h: number): string => {
-  //   const out = document.createElement('canvas')
-  //   out.width = w
-  //   out.height = h
-  //   const ctx = out.getContext('2d')
-  //   if (!ctx) return ''
-  //   ctx.filter =
-  //     document.documentElement.dataset.theme === 'dark' ? DARK_FACE_FILTER : LIGHT_FACE_FILTER
-  //   ctx.drawImage(source, 0, 0, w, h)
-  //   return out.toDataURL('image/png')
-  // }
-
   // The theme look is baked into the face pixels at capture time instead of
   // applied via CSS: a CSS filter on an element inside the flipper's 3D
   // preserve-3d subtree is dropped by GPU compositors once the face flips
   // past 90°, which flashed raw paper mid-turn. Same strings as
   // PdfViewport.module.css, so the faces match the live pages exactly.
+  // Non-destructive only: contrast/grayscale/brightness chains crushed glyph
+  // anti-aliasing and made text read as low resolution. lamplight is 'none'
+  // because its live page has no filter either — the turning sheet must
+  // match the page it lands as. An unknown theme falls back to 'none'
+  // (original pixels), never to another theme's look.
   const FACE_FILTERS: Record<string, string> = {
-    kindle: 'grayscale(100%) contrast(1.55) brightness(0.92)',
-    dark: 'grayscale(100%) contrast(1.55) brightness(0.92) invert(1) sepia(0.25) brightness(0.95)',
-    // Lamplight — very gentle warmth so page-turn faces don't flash white,
-    // but charts and photos still keep their real colors.
-    lamplight: 'sepia(0.12) saturate(1.05) brightness(0.98)',
+    kindle: 'grayscale(100%)',
+    dark: 'invert(1) hue-rotate(180deg)',
+    lamplight: 'none',
   }
 
   const bakeFace = (source: HTMLCanvasElement, w: number, h: number): string => {
@@ -410,7 +392,7 @@ export function ReaderScreen() {
     const ctx = out.getContext('2d')
     if (!ctx) return ''
     const theme = document.documentElement.dataset.theme ?? 'kindle'
-    ctx.filter = FACE_FILTERS[theme] ?? FACE_FILTERS.kindle
+    ctx.filter = FACE_FILTERS[theme] ?? 'none'
     ctx.drawImage(source, 0, 0, w, h)
     return out.toDataURL('image/png')
   }
@@ -1083,147 +1065,147 @@ export function ReaderScreen() {
         />
       ) : null}
       <div ref={stageRef} className={styles.stage} onClick={dismissSettings}>
-        <ReaderIsland
-          pageNumber={pageNumber}
-          pageCount={pageCount}
-          pageInput={pageInput}
-          onPageInputChange={setPageInput}
-          onPageCommit={commitPage}
-          percent={percentForPage(spread ? (rightPage ?? leftPage) : pageNumber, pageCount)}
-          canPrev={spread ? leftPage > 1 : sequenceIndex > 0}
-          canNext={
-            spread
-              ? (rightPage ?? leftPage) < pageCount
-              : sequenceIndex < sequence.length - 1
-          }
-          onPrev={onPrev}
-          onNext={onNext}
-          spread={spread}
-          rangeLabel={spread && rightPage ? `– ${rightPage}` : undefined}
-          onScrubCommit={onScrubCommit}
-          getPagePreview={getPagePreview}
-          chapterLabelForPage={chapterLabelForPage}
-          railMarks={railMarks}
-          onLibrary={() => {
-            void persistProgress(pageRef.current, sequenceIndexRef.current)
-            closeReader('library')
-          }}
-          bookmarked={bookmarked}
-          onToggleBookmark={() => void toggleBookmark()}
-          tool={tool}
-          onTool={handleTool}
-          onNotes={() => {
-            void persistProgress(pageRef.current, sequenceIndexRef.current)
-            closeReader('notes')
-          }}
-          onSettings={() => setSettingsOpen((open) => !open)}
-          onZoomOut={() => changeScale(scale - SCALE_STEP)}
-          onZoomIn={() => changeScale(scale + SCALE_STEP)}
-          zoomLabel={`${Math.round(scale * 100)}%`}
-          onFullscreen={() => {
-            const node = stageRef.current
-            if (!node) return
-            if (document.fullscreenElement) void document.exitFullscreen()
-            else void node.requestFullscreen()
-          }}
-          held={heldChrome}
-          onExpandedChange={setIslandExpanded}
-        />
+      <ReaderIsland
+        pageNumber={pageNumber}
+        pageCount={pageCount}
+        pageInput={pageInput}
+        onPageInputChange={setPageInput}
+        onPageCommit={commitPage}
+        percent={percentForPage(spread ? (rightPage ?? leftPage) : pageNumber, pageCount)}
+        canPrev={spread ? leftPage > 1 : sequenceIndex > 0}
+        canNext={
+          spread
+            ? (rightPage ?? leftPage) < pageCount
+            : sequenceIndex < sequence.length - 1
+        }
+        onPrev={onPrev}
+        onNext={onNext}
+        spread={spread}
+        rangeLabel={spread && rightPage ? `– ${rightPage}` : undefined}
+        onScrubCommit={onScrubCommit}
+        getPagePreview={getPagePreview}
+        chapterLabelForPage={chapterLabelForPage}
+        railMarks={railMarks}
+        onLibrary={() => {
+          void persistProgress(pageRef.current, sequenceIndexRef.current)
+          closeReader('library')
+        }}
+        bookmarked={bookmarked}
+        onToggleBookmark={() => void toggleBookmark()}
+        tool={tool}
+        onTool={handleTool}
+        onNotes={() => {
+          void persistProgress(pageRef.current, sequenceIndexRef.current)
+          closeReader('notes')
+        }}
+        onSettings={() => setSettingsOpen((open) => !open)}
+        onZoomOut={() => changeScale(scale - SCALE_STEP)}
+        onZoomIn={() => changeScale(scale + SCALE_STEP)}
+        zoomLabel={`${Math.round(scale * 100)}%`}
+        onFullscreen={() => {
+          const node = stageRef.current
+          if (!node) return
+          if (document.fullscreenElement) void document.exitFullscreen()
+          else void node.requestFullscreen()
+        }}
+        held={heldChrome}
+        onExpandedChange={setIslandExpanded}
+      />
 
-        {settingsOpen && (islandExpanded || heldChrome) ? (
-          <div className={styles.settings}>
-            <p className={styles.settingsLabel}>Reading theme</p>
-            <button
-              type="button"
-              className={
-                theme === 'kindle'
-                  ? `${styles.themeOption} ${styles.themeOptionActive}`
-                  : styles.themeOption
-              }
-              onClick={() => setTheme('kindle')}
-            >
-              Kindle
-              <span className={styles.themeOptionSub}>Warm e-ink monochrome</span>
-            </button>
-            <button
-              type="button"
-              className={
-                theme === 'dark'
-                  ? `${styles.themeOption} ${styles.themeOptionActive}`
-                  : styles.themeOption
-              }
-              onClick={() => setTheme('dark')}
-            >
-              Dark e-ink
-              <span className={styles.themeOptionSub}>True-black room, visible page sheet</span>
-            </button>
-            <button
-              type="button"
-              className={
-                theme === 'lamplight'
-                  ? `${styles.themeOption} ${styles.themeOptionActive}`
-                  : styles.themeOption
-              }
-              onClick={() => setTheme('lamplight')}
-            >
-              Lamplight
-              <span className={styles.themeOptionSub}>Warm tungsten, low-glare night</span>
-            </button>
-            <p className={styles.settingsLabel}>Layout</p>
-            <button
-              type="button"
-              className={
-                spread
-                  ? `${styles.themeOption} ${styles.themeOptionActive}`
-                  : styles.themeOption
-              }
-              onClick={toggleSpread}
-            >
-              Two-page spread
-              <span className={styles.themeOptionSub}>Side-by-side pages, auto-fit</span>
-            </button>
-            <p className={styles.settingsLabel}>Position</p>
-            <button
-              type="button"
-              className={styles.settingsAction}
-              onClick={() => {
-                goToIndex(0)
-                showHint('Back at page 1')
-              }}
-              disabled={sequenceIndex === 0}
-            >
-              Restart from page 1
-              <span className={styles.themeOptionSub}>Clears this book's resume point</span>
-            </button>
-          </div>
-        ) : null}
+      {settingsOpen && (islandExpanded || heldChrome) ? (
+        <div className={styles.settings}>
+          <p className={styles.settingsLabel}>Reading theme</p>
+          <button
+            type="button"
+            className={
+              theme === 'kindle'
+                ? `${styles.themeOption} ${styles.themeOptionActive}`
+                : styles.themeOption
+            }
+            onClick={() => setTheme('kindle')}
+          >
+            Kindle
+            <span className={styles.themeOptionSub}>Warm e-ink monochrome</span>
+          </button>
+          <button
+            type="button"
+            className={
+              theme === 'dark'
+                ? `${styles.themeOption} ${styles.themeOptionActive}`
+                : styles.themeOption
+            }
+            onClick={() => setTheme('dark')}
+          >
+            Dark e-ink
+            <span className={styles.themeOptionSub}>True-black room, visible page sheet</span>
+          </button>
+          <button
+            type="button"
+            className={
+              theme === 'lamplight'
+                ? `${styles.themeOption} ${styles.themeOptionActive}`
+                : styles.themeOption
+            }
+            onClick={() => setTheme('lamplight')}
+          >
+            Lamplight
+            <span className={styles.themeOptionSub}>Warm tungsten, low-glare night</span>
+          </button>
+          <p className={styles.settingsLabel}>Layout</p>
+          <button
+            type="button"
+            className={
+              spread
+                ? `${styles.themeOption} ${styles.themeOptionActive}`
+                : styles.themeOption
+            }
+            onClick={toggleSpread}
+          >
+            Two-page spread
+            <span className={styles.themeOptionSub}>Side-by-side pages, auto-fit</span>
+          </button>
+          <p className={styles.settingsLabel}>Position</p>
+          <button
+            type="button"
+            className={styles.settingsAction}
+            onClick={() => {
+              goToIndex(0)
+              showHint('Back at page 1')
+            }}
+            disabled={sequenceIndex === 0}
+          >
+            Restart from page 1
+            <span className={styles.themeOptionSub}>Clears this book's resume point</span>
+          </button>
+        </div>
+      ) : null}
 
-        <div
-          className={
-            spread ? `${styles.pageWrap} ${styles.pageWrapSpread}` : styles.pageWrap
-          }
-        >
-          {loadError ? (
-            <p className={styles.status}>{loadError}</p>
-          ) : engineReady ? (
-            spread ? (
-              <>
-                <div ref={bookRef} className={styles.book}>
-                  <div className={styles.bookCover} aria-hidden />
-                  <div className={styles.bookBlock} aria-hidden>
-                    <span className={styles.stackTop} />
-                    <span className={styles.stackBot} />
-                    <span className={styles.stackSideL} />
-                    <span className={styles.stackSideR} />
-                  </div>
-                  {renderViewport(leftPage)}
-                  {rightPage != null ? renderViewport(rightPage) : null}
-                  <div className={styles.bookShadeL} aria-hidden />
-                  <div className={styles.bookShadeR} aria-hidden />
-                  <div className={styles.bookGutter} aria-hidden />
-                  <div className={styles.bookShadow} aria-hidden />
+      <div
+        className={
+          spread ? `${styles.pageWrap} ${styles.pageWrapSpread}` : styles.pageWrap
+        }
+      >
+        {loadError ? (
+          <p className={styles.status}>{loadError}</p>
+        ) : engineReady ? (
+          spread ? (
+            <>
+              <div ref={bookRef} className={styles.book}>
+                <div className={styles.bookCover} aria-hidden />
+                <div className={styles.bookBlock} aria-hidden>
+                  <span className={styles.stackTop} />
+                  <span className={styles.stackBot} />
+                  <span className={styles.stackSideL} />
+                  <span className={styles.stackSideR} />
                 </div>
-                {/* The flipper is a SIBLING of the book, positioned in the
+                {renderViewport(leftPage)}
+                {rightPage != null ? renderViewport(rightPage) : null}
+                <div className={styles.bookShadeL} aria-hidden />
+                <div className={styles.bookShadeR} aria-hidden />
+                <div className={styles.bookGutter} aria-hidden />
+                <div className={styles.bookShadow} aria-hidden />
+              </div>
+              {/* The flipper is a SIBLING of the book, positioned in the
                   pageWrap's stable coordinate space: cover turns re-center
                   the book at the commit, and a flipper anchored inside the
                   book would teleport with it mid-flight. data-phase starts
@@ -1233,69 +1215,69 @@ export function ReaderScreen() {
                   driven, not wall-clock). Visibility is NOT an inline style:
                   React would hold its own copy of the property, and the
                   attribute-keyed css owns it instead. */}
-                {turn ? (
-                  <div
-                    ref={flipperRef}
-                    className={styles.turnFlipper}
-                    data-phase="departing"
-                    style={{
-                      left: turn.box.left,
-                      top: turn.box.top,
-                      width: turn.box.width,
-                      height: turn.box.height,
-                      transformOrigin:
-                        turn.slot === 'left' ? 'right center' : 'left center',
-                    }}
-                    aria-hidden
-                  >
-                    <div className={`${styles.turnFace} ${styles.turnFaceFront}`}>
-                      <img className={styles.turnImg} src={turn.frontSrc} alt="" />
-                    </div>
-                    <div className={`${styles.turnFace} ${styles.turnFaceBack}`}>
-                      <img className={styles.turnImg} src={turn.backSrc} alt="" />
-                    </div>
+              {turn ? (
+                <div
+                  ref={flipperRef}
+                  className={styles.turnFlipper}
+                  data-phase="departing"
+                  style={{
+                    left: turn.box.left,
+                    top: turn.box.top,
+                    width: turn.box.width,
+                    height: turn.box.height,
+                    transformOrigin:
+                      turn.slot === 'left' ? 'right center' : 'left center',
+                  }}
+                  aria-hidden
+                >
+                  <div className={`${styles.turnFace} ${styles.turnFaceFront}`}>
+                    <img className={styles.turnImg} src={turn.frontSrc} alt="" />
                   </div>
-                ) : null}
-              </>
-            ) : (
-              renderViewport(pageNumber)
-            )
+                  <div className={`${styles.turnFace} ${styles.turnFaceBack}`}>
+                    <img className={styles.turnImg} src={turn.backSrc} alt="" />
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : (
-            <p className={styles.status}>Opening…</p>
-          )}
-        </div>
+            renderViewport(pageNumber)
+          )
+        ) : (
+          <p className={styles.status}>Opening…</p>
+        )}
+      </div>
 
-        {pendingAnnotation ? (
-          <AnnotationComposer
-            selectedText={pendingAnnotation.selectedText}
-            onCancel={() => {
-              setPendingAnnotation(null)
-              setTool('none')
-              clearBrowserSelection()
-              lastSelection.current = null
-            }}
-            onSave={(body) => {
-              const annotation: Annotation = {
-                id: crypto.randomUUID(),
-                bookId: book.id,
-                anchor: {
-                  pageNumber: selectionPage(pendingAnnotation, pageRef.current),
-                  selectedText: pendingAnnotation.selectedText,
-                  rects: pendingAnnotation.rects,
-                },
-                body,
-                createdAt: nowIso(),
-                updatedAt: nowIso(),
-              }
-              void annotationsRepo.put(annotation)
-              setAnnotations((current) => [...current, annotation])
-              setPendingAnnotation(null)
-              setTool('none')
-              clearBrowserSelection()
-              lastSelection.current = null
-            }}
-          />
-        ) : null}
+      {pendingAnnotation ? (
+        <AnnotationComposer
+          selectedText={pendingAnnotation.selectedText}
+          onCancel={() => {
+            setPendingAnnotation(null)
+            setTool('none')
+            clearBrowserSelection()
+            lastSelection.current = null
+          }}
+          onSave={(body) => {
+            const annotation: Annotation = {
+              id: crypto.randomUUID(),
+              bookId: book.id,
+              anchor: {
+                pageNumber: selectionPage(pendingAnnotation, pageRef.current),
+                selectedText: pendingAnnotation.selectedText,
+                rects: pendingAnnotation.rects,
+              },
+              body,
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+            }
+            void annotationsRepo.put(annotation)
+            setAnnotations((current) => [...current, annotation])
+            setPendingAnnotation(null)
+            setTool('none')
+            clearBrowserSelection()
+            lastSelection.current = null
+          }}
+        />
+      ) : null}
       </div>
     </div>
   )

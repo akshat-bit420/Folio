@@ -57,3 +57,19 @@
 .ghost {
   color: var(--ink-soft);
 }
+
+/* ------------------------------------------------------------------
+   Lamplight: the editor sits on the dark espresso card, so the input
+   well must be dark too. var(--paper) is the light PAGE tone in this
+   theme (#decfb6) — kindle's light-input look — which left the light
+   --ink cream text invisible while typing. Chrome-hover is the theme's
+   raised dark surface; border-strong keeps the well visible. */
+:global([data-theme='lamplight']) .editor {
+  background: var(--chrome-hover);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+:global([data-theme='lamplight']) .editor::placeholder {
+  color: var(--ink-soft);
+} 

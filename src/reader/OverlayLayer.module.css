@@ -51,8 +51,11 @@
   background-color: rgb(245 158 11 / 0.34);
 }
 
-/* Lamplight: multiply on the warm cream page so amber highlight / annotation
-   washes darken the paper naturally instead of washing colors out. */
+/* ------------------------------------------------------------------ */
+/* Lamplight: multiply on the warm cream page so amber highlight /     */
+/* annotation washes darken the paper naturally instead of washing     */
+/* colors out (same reasoning as the kindle layer below).              */
+/* ------------------------------------------------------------------ */
 :global([data-theme='lamplight']) .layer {
   mix-blend-mode: multiply;
 }

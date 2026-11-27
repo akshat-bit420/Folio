@@ -2,10 +2,10 @@
  *
  * The PDF pipeline still renders the page the normal way: the engine
  * paints warm paper (--pdf-paper: #f4ecd8) and dark ink. PdfViewport's
- * canvas filter then inverts that image's luminance, producing a page
- * that is warm near-black with warm off-white text — computed result:
- *   paper #f4ecd8 -> #151413
- *   ink   #1a1a1a -> #f2f2ee
+ * canvas filter then inverts that image's luminance — a smart invert
+ * (invert(1) hue-rotate(180deg), no grayscale/contrast/brightness) so
+ * glyph anti-aliasing and colored content survive untouched — producing
+ * a page that is near-black with off-white text.
  *
  * Review feedback after the first Emerald Depth pass: the teal room was
  * too much — "the background should remain black". So surfaces are the
@@ -18,44 +18,44 @@
  * the approved theme-variants mock (Graphite variant): #33d094.
  */
 :root[data-theme='dark'] {
-    --surface: #0e0d0c;
-    --paper: #151413;
-    --pdf-paper: #f4ecd8;
-    --ink: #f2f2ee;
-    --ink-soft: #a9a49c;
-    --chrome: #1c1b18;
-    --chrome-hover: #2b2925;
-    --border: rgb(235 228 214 / 0.1);
-    --border-strong: rgb(235 228 214 / 0.18);
-    --progress: #33d094;
-    --progress-track: rgb(235 228 214 / 0.12);
-    --highlight: rgb(51 208 148 / 0.32);
-    --annotation: #33d094;
-    --annotation-wash: rgb(51 208 148 / 0.22);
-    --accent-active: #33d094;
-    --accent-active-bg: rgb(51 208 148 / 0.14);
-    --accent-active-border: rgb(51 208 148 / 0.35);
-    --bookmark-active: #fb7185;
-    --bookmark-active-bg: rgb(251 113 133 / 0.16);
-    --hint: rgb(235 228 214 / 0.66);
-    --danger: #e07856;
-    --shadow: 0 0 0 1px rgb(235 228 214 / 0.07), 0 18px 44px rgb(0 0 0 / 0.5);
-    --font-ui: 'Segoe UI', system-ui, sans-serif;
-    --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
+  --surface: #0e0d0c;
+  --paper: #151413;
+  --pdf-paper: #f4ecd8;
+  --ink: #f2f2ee;
+  --ink-soft: #a9a49c;
+  --chrome: #1c1b18;
+  --chrome-hover: #2b2925;
+  --border: rgb(235 228 214 / 0.1);
+  --border-strong: rgb(235 228 214 / 0.18);
+  --progress: #33d094;
+  --progress-track: rgb(235 228 214 / 0.12);
+  --highlight: rgb(51 208 148 / 0.32);
+  --annotation: #33d094;
+  --annotation-wash: rgb(51 208 148 / 0.22);
+  --accent-active: #33d094;
+  --accent-active-bg: rgb(51 208 148 / 0.14);
+  --accent-active-border: rgb(51 208 148 / 0.35);
+  --bookmark-active: #fb7185;
+  --bookmark-active-bg: rgb(251 113 133 / 0.16);
+  --hint: rgb(235 228 214 / 0.66);
+  --danger: #e07856;
+  --shadow: 0 0 0 1px rgb(235 228 214 / 0.07), 0 18px 44px rgb(0 0 0 / 0.5);
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Palatino Linotype', Palatino, 'Iowan Old Style', Georgia, serif;
 }
 
 /* Island on dark: the charcoal droplet from the approved design — warm
    near-black body, cream text, and the Graphite green as its accent
    (progress fill, active page number, armed tool states). */
 :root[data-theme='dark'] {
-    --island-bg: rgb(28 24 18 / 0.92);
-    --island-border: rgb(242 234 217 / 0.1);
-    --island-ink: #f2ead9;
-    --island-ink-soft: rgb(242 234 217 / 0.55);
-    --island-track: rgb(242 234 217 / 0.22);
-    --island-sep: rgb(242 234 217 / 0.16);
-    --island-hover-bg: rgb(242 234 217 / 0.12);
-    --island-accent: #33d094;
-    --island-accent-soft: #6fe3b8;
-    --island-shadow: 0 6px 22px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.55);
+  --island-bg: rgb(28 24 18 / 0.92);
+  --island-border: rgb(242 234 217 / 0.1);
+  --island-ink: #f2ead9;
+  --island-ink-soft: rgb(242 234 217 / 0.55);
+  --island-track: rgb(242 234 217 / 0.22);
+  --island-sep: rgb(242 234 217 / 0.16);
+  --island-hover-bg: rgb(242 234 217 / 0.12);
+  --island-accent: #33d094;
+  --island-accent-soft: #6fe3b8;
+  --island-shadow: 0 6px 22px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.55);
 }
